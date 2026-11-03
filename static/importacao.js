@@ -489,7 +489,7 @@
       : "\n\n⚠ Você ainda não buscou as diferenças.";
     const msg =
       "Gravar PRECO_VENDA no Firebird agora?\n" +
-      "Casa por id_identificador e altera só o preço de venda." +
+      "Casa cast(CODIGO as int) = cast(id_identificador as int) e altera só o preço de venda." +
       `${info}\n\nSe houver qualquer erro, nada será gravado.`;
     if (confirm(msg)) rodarDifAplicar(false);
   });

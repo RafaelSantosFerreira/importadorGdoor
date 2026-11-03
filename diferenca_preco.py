@@ -1,8 +1,9 @@
 """Diferenças de PRECO_VENDA entre o CSV e a tabela ESTOQUE.
 
-Casamento: ESTOQUE.CODIGO <-> coluna `id_identificador` do CSV, comparando pelo
-valor numérico (``4152`` == ``004152``), já que CODIGO é VARCHAR(6) com zeros à
-esquerda.
+Casamento: ``cast(CODIGO as int) = cast(id_identificador as int)``, já que
+CODIGO é VARCHAR(6) com zeros à esquerda (``004152``) e o CSV traz ``4152``.
+Código que não é inteiro não casa com ninguém — o cast falharia no banco —, e
+entra na contagem ``sem_codigo``.
 
 Condição de diferença: ``PRECO_VENDA <> prc_venda``.
 
@@ -24,7 +25,6 @@ import progresso
 from csv_origem import ler_linhas_csv
 from db import conectar
 from mapeamento_store import carregar as carregar_mapeamento
-from preco_service import normalizar_codigo
 from transform import fmt_num, para_numero
 
 COLUNA_IDENTIFICADOR = "id_identificador"
@@ -32,16 +32,29 @@ COLUNA_PRECO_PADRAO = "prc_venda"
 LIMITE_ITENS = 2000
 
 
+def como_int(valor) -> int | None:
+    """Equivalente a ``cast(valor as int)``; None quando não dá para converter."""
+    if valor is None:
+        return None
+    texto = str(valor).strip()
+    if not texto:
+        return None
+    try:
+        return int(texto)
+    except ValueError:
+        return None
+
+
 def _coluna_preco(cfg: dict) -> str:
     return (cfg.get("mapeamento") or {}).get("PRECO_VENDA") or COLUNA_PRECO_PADRAO
 
 
-def _carregar_banco(cur) -> dict[str, tuple[str, Decimal | None, str]]:
-    """codigo_normalizado -> (CODIGO exato, PRECO_VENDA atual, DESCRICAO)."""
+def _carregar_banco(cur) -> dict[int, tuple[str, Decimal | None, str]]:
+    """cast(CODIGO as int) -> (CODIGO exato, PRECO_VENDA atual, DESCRICAO)."""
     cur.execute("SELECT CODIGO, PRECO_VENDA, DESCRICAO FROM ESTOQUE")
-    out: dict[str, tuple[str, Decimal | None, str]] = {}
+    out: dict[int, tuple[str, Decimal | None, str]] = {}
     for codigo, preco, descricao in cur.fetchall():
-        chave = normalizar_codigo(codigo)
+        chave = como_int(codigo)
         if chave is not None:
             out[chave] = (codigo, preco, (descricao or "").strip())
     return out
@@ -54,12 +67,12 @@ def _analisar(cur, rows: list[dict], coluna_preco: str) -> dict:
     diferentes: list[dict] = []
     iguais = sem_codigo = sem_preco = nao_encontrados = duplicados = zerariam = 0
     faltando: list[str] = []
-    vistos: set[str] = set()
+    vistos: set[int] = set()
     total = len(rows)
 
     for i, row in enumerate(rows, start=1):
         bruto = (row.get(COLUNA_IDENTIFICADOR) or "").strip()
-        chave = normalizar_codigo(bruto)
+        chave = como_int(bruto)
         preco_csv = para_numero(row.get(coluna_preco))
 
         if chave is None:
