@@ -8,8 +8,27 @@
 {% block content %}
 <section class="card">
   <div class="card-head">
-    <h2>O que fazer</h2>
-    <span class="hint">Valores vazios no CSV nunca apagam dados do banco.</span>
+    <h2>Atualizar só o preço de venda</h2>
+    <span class="hint">Não insere produtos e não altera nenhum outro campo.</span>
+  </div>
+  <div class="card-body">
+    <p style="margin:0 0 0.5rem">
+      Casa <span class="chip">ESTOQUE.CODIGO</span> com a coluna <span class="chip">id_estoque</span> do CSV
+      pelo número (<span class="chip">4152</span> = <span class="chip">004152</span>) e grava
+      <span class="chip">PRECO_VENDA</span> a partir de <span class="chip" id="colPreco">prc_venda</span>.
+    </p>
+    <p class="muted" style="margin:0">Preço zero ou vazio no CSV é ignorado. Códigos que não existem no banco são só listados.</p>
+  </div>
+  <div class="card-foot">
+    <button type="button" id="btnPrecoSimular">Simular preços</button>
+    <button type="button" class="danger" id="btnPrecoAplicar">Gravar preços</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Importação completa</h2>
+    <span class="hint">Valores vazios no CSV nunca apagam dados do banco; preço zero não zera.</span>
   </div>
   <div class="card-body options">
     <label class="option">

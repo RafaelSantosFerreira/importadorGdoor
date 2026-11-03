@@ -13,6 +13,7 @@ from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
 from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
 from mapeamento_store import salvar as salvar_mapeamento
+from preco_service import atualizar_somente_preco
 
 app = Flask(__name__)
 _job_lock = threading.Lock()
@@ -184,6 +185,24 @@ def api_importar():
 
     titulo = "Simulando importação…" if dry_run else "Aplicando importação no banco…"
     ok, msg = _iniciar_job("importar", titulo, worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True, "dry_run": dry_run})
+
+
+@app.post("/api/preco")
+def api_preco():
+    payload = request.get_json(force=True) or {}
+    dry_run = bool(payload.get("dry_run", True))
+
+    def worker():
+        try:
+            progresso.finish(atualizar_somente_preco(dry_run=dry_run))
+        except Exception as e:
+            progresso.finish(erro=str(e))
+
+    titulo = "Simulando atualização de preços…" if dry_run else "Gravando preços…"
+    ok, msg = _iniciar_job("preco", titulo, worker)
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True, "dry_run": dry_run})

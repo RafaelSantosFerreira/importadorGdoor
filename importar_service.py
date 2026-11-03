@@ -142,7 +142,13 @@ def importar(
                             log.append(f"INSERT {codigo}")
                 else:
                     # ignora vazios: não sobrescreve dado existente com NULL
-                    campos = [c for c in campos_upd if reg.get(c) is not None]
+                    # e preço/custo zero no CSV não zera o preço do banco
+                    campos = [
+                        c
+                        for c in campos_upd
+                        if reg.get(c) is not None
+                        and not (c in CAMPOS_PRECO and reg[c] <= 0)
+                    ]
                     if not campos:
                         pulados += 1
                     else:

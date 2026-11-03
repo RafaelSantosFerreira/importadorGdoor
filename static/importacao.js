@@ -4,7 +4,7 @@
 
   const tbody = document.querySelector("#tabelaLog tbody");
   const card = $("cardProgresso");
-  const botoes = ["btnComparar", "btnDryRun", "btnAplicar"].map($);
+  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnPrecoSimular", "btnPrecoAplicar"].map($);
   const OPCOES = ["atualizar_preco", "atualizar_estoque", "atualizar_cadastro", "inserir_novos"];
 
   let pollTimer = null;
@@ -37,7 +37,7 @@
     const pct = Math.max(0, Math.min(100, Number(p.percent) || 0));
     card.hidden = false;
     const fim = p.done && !p.rodando && !p.erro;
-    const nome = p.operacao === "comparar" ? "Comparação" : "Importação";
+    const nome = { comparar: "Comparação", preco: "Atualização de preços" }[p.operacao] || "Importação";
     $("progressMsg").textContent = fim ? `${nome} concluída` : p.mensagem || "…";
     $("progressPct").textContent = `${pct}%`;
     $("progressFill").style.width = `${pct}%`;
@@ -85,6 +85,7 @@
         }
         const r = p.resultado || {};
         if (operacao === "comparar") concluirComparacao(r);
+        else if (operacao === "preco") concluirPreco(r);
         else concluirImportacao(r, ctx);
         resolve(r);
       }, 400);
@@ -273,13 +274,92 @@
     if (confirm(msg)) rodarImportacao(false);
   });
 
+  // ---------- só preço ----------
+  let ultimaSimPreco = null; // resultado da última simulação de preços
+
+  function concluirPreco(r) {
+    if (r.dry_run) ultimaSimPreco = r;
+    else if (r.gravado) ultimaSimPreco = null;
+
+    let banner;
+    if (r.dry_run) {
+      banner = r.erros
+        ? ["err", "Simulação de preços com erros", "Nada foi gravado. Veja os erros no log."]
+        : ["info", "Simulação de preços concluída", "Nada foi gravado. Confira a lista e clique em “Gravar preços”."];
+    } else if (r.gravado) {
+      banner = ["ok", "Preços gravados no banco", r.situacao];
+    } else {
+      banner = ["err", "Nada foi gravado", r.situacao];
+    }
+
+    const linhas = (r.log || [])
+      .map((l) => `<div class="${l.startsWith("ERRO") ? "l-erro" : "l-update"}">${esc(l)}</div>`)
+      .join("");
+    const faltando = (r.nao_encontrados_amostra || []).map((c) => `<span class="chip">${esc(c)}</span>`).join("");
+
+    $("resultadoImp").innerHTML = `
+      <div class="banner ${banner[0]}"><div><b>${esc(banner[1])}</b><span>${esc(banner[2])}</span></div></div>
+      <div class="tiles" style="margin-bottom:1rem">
+        <div class="tile"><span>Linhas no CSV</span><strong>${fmt(r.linhas_csv)}</strong></div>
+        <div class="tile info"><span>Preço alterado</span><strong>${fmt(r.atualizados)}</strong></div>
+        <div class="tile"><span>Já iguais</span><strong>${fmt(r.iguais)}</strong></div>
+        <div class="tile warn"><span>Sem preço no CSV (ignorados)</span><strong>${fmt(r.sem_preco)}</strong></div>
+        <div class="tile ${r.nao_encontrados ? "warn" : ""}"><span>Código não existe no banco</span><strong>${fmt(r.nao_encontrados)}</strong></div>
+        <div class="tile ${r.erros ? "danger" : ""}"><span>Erros</span><strong>${fmt(r.erros)}</strong></div>
+      </div>
+      ${r.duplicados ? `<p class="muted">${fmt(r.duplicados)} linha(s) com id_estoque repetido foram ignoradas (vale a primeira).</p>` : ""}
+      ${faltando ? `<p class="muted" style="margin:0 0 0.4rem">id_estoque sem produto no banco${r.nao_encontrados > 200 ? " (primeiros 200)" : ""}:</p><div style="margin-bottom:1rem;max-height:120px;overflow:auto">${faltando}</div>` : ""}
+      <p class="muted" style="margin:0 0 0.4rem">Alterações (banco → CSV)${(r.log || []).length >= 300 ? ", primeiras linhas" : ""}:</p>
+      <div class="log-box">${linhas || '<div class="muted">nenhuma alteração</div>'}</div>`;
+
+    const badge = $("impBadge");
+    badge.hidden = false;
+    badge.textContent = r.erros ? `${r.erros} erro(s)` : r.dry_run ? "simulação" : "gravado";
+    mostrarAba("imp");
+
+    const resumo = `${fmt(r.atualizados)} preços alterados, ${fmt(r.iguais)} iguais, ${fmt(r.nao_encontrados)} códigos não encontrados, ${fmt(r.erros)} erros.`;
+    if (r.dry_run) setStatus(`Simulação de preços: ${resumo}`, r.erros ? "err" : "ok");
+    else setStatus(r.gravado ? `Preços gravados: ${resumo}` : `Nada gravado: ${resumo}`, r.gravado ? "ok" : "err");
+  }
+
+  async function rodarPreco(dryRun) {
+    setStatus(dryRun ? "Iniciando simulação de preços…" : "Gravando preços…", "busy");
+    try {
+      await api("/api/preco", { json: { dry_run: dryRun } });
+      await acompanhar("preco");
+    } catch (e) {
+      setBusy(false);
+      setStatus(`Erro ao atualizar preços: ${e.message}`, "err");
+    }
+  }
+
+  $("btnPrecoSimular").addEventListener("click", () => rodarPreco(true));
+  $("btnPrecoAplicar").addEventListener("click", () => {
+    const s = ultimaSimPreco;
+    const info = s
+      ? `\n\nNa última simulação: ${fmt(s.atualizados)} preços seriam alterados${s.erros ? ` e houve ${s.erros} erro(s)` : ""}.`
+      : "\n\n⚠ Você ainda não simulou os preços.";
+    if (confirm(`Gravar PRECO_VENDA no Firebird agora?\nNenhum outro campo será alterado.${info}`)) {
+      rodarPreco(false);
+    }
+  });
+
+  // Mostra qual coluna do CSV alimenta o preço (de-para de PRECO_VENDA).
+  api("/api/mapeamento")
+    .then((m) => {
+      const col = (m.mapeamento || {}).PRECO_VENDA;
+      if (col) $("colPreco").textContent = col;
+    })
+    .catch(() => {});
+
   // Se a página foi recarregada no meio de uma operação, retoma o acompanhamento.
   fetch("/api/progresso")
     .then((r) => r.json())
     .then((p) => {
       if (p.rodando) {
         renderProgresso(p);
-        acompanhar(p.operacao === "comparar" ? "comparar" : "importar").catch(() => {});
+        const op = ["comparar", "preco"].includes(p.operacao) ? p.operacao : "importar";
+        acompanhar(op).catch(() => {});
       }
     })
     .catch(() => {});
