@@ -11,6 +11,7 @@ from conexao_store import salvar as salvar_conexao
 from csv_origem import ler_cabecalho_e_amostra
 from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
 from diferenca_preco import aplicar_diferencas_preco, buscar_diferencas_preco
+from faltantes import buscar_faltantes
 from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
 from mapeamento_store import salvar as salvar_mapeamento
@@ -188,6 +189,22 @@ def api_importar():
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True, "dry_run": dry_run})
+
+
+@app.post("/api/faltantes")
+def api_faltantes():
+    """Só leitura: códigos do CSV que não existem no ESTOQUE."""
+
+    def worker():
+        try:
+            progresso.finish(buscar_faltantes())
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    ok, msg = _iniciar_job("faltantes", "Procurando códigos que faltam no banco…", worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True})
 
 
 @app.post("/api/preco/diferencas")

@@ -4,7 +4,7 @@
 
   const tbody = document.querySelector("#tabelaLog tbody");
   const card = $("cardProgresso");
-  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnDifBuscar", "btnDifSimular", "btnDifAplicar"].map($);
+  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnDifBuscar", "btnDifSimular", "btnDifAplicar", "btnFaltantes"].map($);
   const OPCOES = ["atualizar_preco", "atualizar_estoque", "atualizar_cadastro", "inserir_novos"];
 
   let pollTimer = null;
@@ -22,7 +22,12 @@
   }
   const chaveOpcoes = () => JSON.stringify(opcoes());
 
-  const ABAS = { comp: ["tabComp", "painelComp"], imp: ["tabImp", "painelImp"], dif: ["tabDif", "painelDif"] };
+  const ABAS = {
+    comp: ["tabComp", "painelComp"],
+    imp: ["tabImp", "painelImp"],
+    dif: ["tabDif", "painelDif"],
+    falta: ["tabFalta", "painelFalta"],
+  };
   function mostrarAba(qual) {
     Object.entries(ABAS).forEach(([nome, [tab, painel]]) => {
       const sel = nome === qual;
@@ -42,6 +47,7 @@
     const nome = {
       comparar: "Comparação",
       dif_preco: "Busca de diferenças",
+      faltantes: "Busca de faltantes",
       dif_preco_aplicar: "Atualização de preços",
     }[p.operacao] || "Importação";
     $("progressMsg").textContent = fim ? `${nome} concluída` : p.mensagem || "…";
@@ -92,6 +98,7 @@
         const r = p.resultado || {};
         if (operacao === "comparar") concluirComparacao(r);
         else if (operacao === "dif_preco") concluirDifBusca(r);
+        else if (operacao === "faltantes") concluirFaltantes(r);
         else if (operacao === "dif_preco_aplicar") concluirDifAplicar(r);
         else concluirImportacao(r, ctx);
         resolve(r);
@@ -424,6 +431,82 @@
     if (confirm(msg)) rodarDifAplicar(false);
   });
 
+  // ---------- faltando no banco ----------
+  const tbodyFalta = document.querySelector("#tabelaFalta tbody");
+  let itensFalta = [];
+
+  function itensFaltaFiltrados() {
+    const q = $("buscaFalta").value.trim().toLowerCase();
+    return itensFalta.filter(
+      (r) => !q || r.codigo.toLowerCase().includes(q) || (r.descricao || "").toLowerCase().includes(q)
+    );
+  }
+
+  function renderFalta() {
+    const items = itensFaltaFiltrados();
+    $("infoFalta").textContent = itensFalta.length
+      ? `${fmt(items.length)} de ${fmt(itensFalta.length)} itens`
+      : "";
+    if (!items.length) {
+      tbodyFalta.innerHTML = `<tr><td colspan="7"><div class="empty"><b>${
+        itensFalta.length ? "Nada neste filtro" : "Nenhum código faltando"
+      }</b>${
+        itensFalta.length ? "Limpe a busca para ver todos." : "Todo código do CSV já existe no banco."
+      }</div></td></tr>`;
+      return;
+    }
+    tbodyFalta.innerHTML = items
+      .map(
+        (r) => `<tr>
+          <td class="code">${esc(r.codigo)}</td>
+          <td>${esc(r.descricao)}</td>
+          <td class="code">${esc(r.barras || "—")}</td>
+          <td class="num">${esc(r.preco_venda || "—")}</td>
+          <td class="num">${esc(r.preco_custo || "—")}</td>
+          <td class="num">${esc(r.qtd || "—")}</td>
+          <td class="num">${esc(String(r.linha))}</td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  function concluirFaltantes(r) {
+    $("fTotal").textContent = fmt(r.linhas_csv);
+    $("fFalta").textContent = fmt(r.faltando);
+    $("fExiste").textContent = fmt(r.existentes);
+    $("fBanco").textContent = fmt(r.codigos_no_banco);
+    itensFalta = r.itens || [];
+    $("toolbarFalta").hidden = !itensFalta.length;
+    renderFalta();
+    const badge = $("faltaBadge");
+    badge.hidden = false;
+    badge.textContent = `${fmt(r.faltando)} falt.`;
+    mostrarAba("falta");
+    const extra = r.truncado ? " A lista mostra só os primeiros itens." : "";
+    const dup = r.duplicados ? ` ${fmt(r.duplicados)} linha(s) com codigo repetido ignoradas.` : "";
+    setStatus(`${r.situacao}${dup}${extra}`, "ok");
+  }
+
+  $("buscaFalta").addEventListener("input", renderFalta);
+  $("btnExportarFalta").addEventListener("click", () => {
+    const cab = ["codigo", "descricao", "barras", "preco_venda", "preco_custo", "qtd", "linha"];
+    baixarCsv(
+      `faltando_no_banco_${new Date().toISOString().slice(0, 10)}.csv`,
+      [cab, ...itensFaltaFiltrados().map((r) => cab.map((k) => r[k]))]
+    );
+  });
+
+  $("btnFaltantes").addEventListener("click", async () => {
+    setStatus("Procurando códigos que faltam no banco…", "busy");
+    try {
+      await api("/api/faltantes", { method: "POST" });
+      await acompanhar("faltantes");
+    } catch (e) {
+      setBusy(false);
+      setStatus(`Erro ao buscar faltantes: ${e.message}`, "err");
+    }
+  });
+
   // Mostra qual coluna do CSV alimenta o preço (de-para de PRECO_VENDA).
   api("/api/mapeamento")
     .then((m) => {
@@ -438,7 +521,7 @@
     .then((p) => {
       if (p.rodando) {
         renderProgresso(p);
-        const op = ["comparar", "dif_preco", "dif_preco_aplicar"].includes(p.operacao)
+        const op = ["comparar", "dif_preco", "dif_preco_aplicar", "faltantes"].includes(p.operacao)
           ? p.operacao
           : "importar";
         acompanhar(op).catch(() => {});

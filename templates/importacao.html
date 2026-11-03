@@ -34,6 +34,27 @@
 
 <section class="card">
   <div class="card-head">
+    <h2>Faltando no banco</h2>
+    <span class="hint">O CSV é a referência; nada é gravado.</span>
+  </div>
+  <div class="card-body">
+    <p style="margin:0 0 0.5rem">
+      Percorre o CSV e lista os <span class="chip">id_identificador</span> que não têm
+      <span class="chip">CODIGO</span> correspondente no ESTOQUE
+      (<span class="chip">cast as int</span> nos dois lados).
+    </p>
+    <p class="muted" style="margin:0">
+      Lista todos os faltantes, com a linha do arquivo. Para cadastrar, use
+      <b>Inserir produtos novos</b> na importação completa.
+    </p>
+  </div>
+  <div class="card-foot">
+    <button type="button" id="btnFaltantes">Buscar faltantes</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
     <h2>Importação completa</h2>
     <span class="hint">Valores vazios no CSV nunca apagam dados do banco; preço zero não zera.</span>
   </div>
@@ -89,6 +110,7 @@
     <button type="button" role="tab" id="tabComp" aria-selected="true" aria-controls="painelComp">Comparação</button>
     <button type="button" role="tab" id="tabImp" aria-selected="false" aria-controls="painelImp">Resultado da importação <span class="count" id="impBadge" hidden></span></button>
     <button type="button" role="tab" id="tabDif" aria-selected="false" aria-controls="painelDif">Diferenças de preço <span class="count" id="difBadge" hidden></span></button>
+    <button type="button" role="tab" id="tabFalta" aria-selected="false" aria-controls="painelFalta">Faltando no banco <span class="count" id="faltaBadge" hidden></span></button>
   </div>
 
   <div id="painelComp" role="tabpanel" aria-labelledby="tabComp">
@@ -162,6 +184,39 @@
         </thead>
         <tbody>
           <tr><td colspan="5"><div class="empty"><b>Nenhuma busca ainda</b>Clique em “Buscar diferenças de preço”.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="painelFalta" role="tabpanel" aria-labelledby="tabFalta" hidden>
+    <div class="card-body tiles">
+      <div class="tile"><span>Linhas no CSV</span><strong id="fTotal">—</strong></div>
+      <div class="tile warn"><span>Faltando no banco</span><strong id="fFalta">—</strong></div>
+      <div class="tile ok"><span>Já existem</span><strong id="fExiste">—</strong></div>
+      <div class="tile"><span>Códigos no banco</span><strong id="fBanco">—</strong></div>
+    </div>
+    <div class="toolbar" id="toolbarFalta" hidden>
+      <input type="search" id="buscaFalta" placeholder="Buscar código ou descrição…" />
+      <span class="muted" id="infoFalta"></span>
+      <span class="spacer"></span>
+      <button type="button" class="small" id="btnExportarFalta">Baixar CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tabelaFalta">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Cód. barras</th>
+            <th class="num">Preço venda</th>
+            <th class="num">Preço custo</th>
+            <th class="num">Qtd</th>
+            <th class="num">Linha</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="7"><div class="empty"><b>Nenhuma busca ainda</b>Clique em “Buscar faltantes”.</div></td></tr>
         </tbody>
       </table>
     </div>
