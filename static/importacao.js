@@ -548,6 +548,54 @@
     }
   });
 
+  // ---------- validação de código de barras ----------
+  // Liga/desliga TR_ESTOQUE_BARRAS, que chama FN_VALIDA_BARCODE a cada gravação.
+  const chkBarras = $("validacaoBarras");
+  const infoBarras = $("validacaoInfo");
+  let barrasEstado = null;
+
+  function pintarBarras(r) {
+    barrasEstado = r;
+    chkBarras.checked = Boolean(r.ativo);
+    chkBarras.disabled = !r.existe;
+    infoBarras.textContent = r.situacao || "";
+    infoBarras.classList.toggle("muted", true);
+  }
+
+  function erroBarras(msg) {
+    // volta o checkbox para o estado real: a troca não aconteceu
+    if (barrasEstado) chkBarras.checked = Boolean(barrasEstado.ativo);
+    infoBarras.textContent = msg;
+    setStatus(msg.split("\n")[0], "err");
+  }
+
+  async function carregarBarras() {
+    try {
+      const r = await api("/api/validacao-barras");
+      pintarBarras(r);
+    } catch (e) {
+      chkBarras.disabled = true;
+      infoBarras.textContent = `Não foi possível ler o estado: ${e.message}`;
+    }
+  }
+
+  chkBarras.addEventListener("change", async () => {
+    const querAtivar = chkBarras.checked;
+    chkBarras.disabled = true;
+    infoBarras.textContent = querAtivar ? "Ligando validação…" : "Desligando validação…";
+    try {
+      const r = await api("/api/validacao-barras", { json: { ativo: querAtivar } });
+      pintarBarras(r);
+      setStatus(r.situacao, "ok");
+    } catch (e) {
+      erroBarras(e.message);
+    } finally {
+      chkBarras.disabled = !(barrasEstado && barrasEstado.existe);
+    }
+  });
+
+  carregarBarras();
+
   // Mostra qual coluna do CSV alimenta o preço (de-para de PRECO_VENDA).
   api("/api/mapeamento")
     .then((m) => {

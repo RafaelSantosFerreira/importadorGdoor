@@ -8,6 +8,21 @@
 {% block content %}
 <section class="card">
   <div class="card-head">
+    <h2>Validação de código de barras</h2>
+    <span class="hint">Trigger <code>TR_ESTOQUE_BARRAS</code> → <code>FN_VALIDA_BARCODE</code></span>
+  </div>
+  <div class="card-body options">
+    <label class="option">
+      <input type="checkbox" id="validacaoBarras" />
+      <span><b>Validar código de barras ao gravar</b>
+        <small id="validacaoInfo">Lendo estado no banco…</small>
+      </span>
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
     <h2>Preço de venda</h2>
     <span class="hint">Não insere produtos e não altera nenhum outro campo.</span>
   </div>

@@ -13,6 +13,8 @@ from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
 from diferenca_preco import aplicar_diferencas_preco, buscar_diferencas_preco
 from diferenca_saldo import aplicar_diferencas_saldo, buscar_diferencas_saldo
 from faltantes import buscar_faltantes
+from validacao_barras import definir as definir_validacao
+from validacao_barras import status as status_validacao
 from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
 from mapeamento_store import salvar as salvar_mapeamento
@@ -190,6 +192,25 @@ def api_importar():
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True, "dry_run": dry_run})
+
+
+@app.get("/api/validacao-barras")
+def api_validacao_barras():
+    try:
+        return jsonify(status_validacao())
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 500
+
+
+@app.post("/api/validacao-barras")
+def api_validacao_barras_definir():
+    payload = request.get_json(force=True) or {}
+    if "ativo" not in payload:
+        return jsonify({"ok": False, "erro": "Informe 'ativo'."}), 400
+    try:
+        return jsonify(definir_validacao(bool(payload["ativo"])))
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 500
 
 
 @app.post("/api/saldo/diferencas")
