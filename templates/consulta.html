@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Consulta — Migrador Gdoor{% endblock %}
+{% block heading %}Consulta{% endblock %}
+{% block subtitle %}Busque no ESTOQUE ou rode um SELECT. Nada aqui grava no banco.{% endblock %}
+{% block status %}
+  <div id="status" class="status-bar" role="status" aria-live="polite">Busque por código, código de barras ou descrição.</div>
+{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Buscar no estoque</h2>
+    <span class="hint">Código, código de barras ou trecho da descrição.</span>
+  </div>
+  <div class="card-body">
+    <div class="toolbar" style="padding:0">
+      <input type="search" id="termo" placeholder="Ex.: 5197, COCA COLA, 7894900011517" style="flex:1" />
+      <label class="muted" for="limiteBusca">Máx.</label>
+      <input type="number" id="limiteBusca" value="200" min="1" max="2000" style="width:6rem" />
+      <button type="button" id="btnBuscar">Buscar</button>
+    </div>
+    <p class="muted" style="margin:0.6rem 0 0">
+      Código digitado sem zeros à esquerda também acha: <span class="chip">5197</span> encontra
+      <span class="chip">005197</span>.
+    </p>
+  </div>
+  <div class="toolbar" id="toolbarBusca" hidden>
+    <span class="muted" id="infoBusca"></span>
+    <span class="spacer"></span>
+    <button type="button" class="small" id="btnExportarBusca">Baixar CSV</button>
+  </div>
+  <div class="table-wrap">
+    <table id="tabelaBusca">
+      <thead><tr><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td><div class="empty"><b>Nenhuma busca ainda</b>Digite algo e clique em “Buscar”.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>SELECT livre</h2>
+    <span class="hint">Somente leitura: a transação sempre termina em ROLLBACK.</span>
+  </div>
+  <div class="card-body">
+    <textarea id="sql" rows="5" spellcheck="false"
+      style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:0.9rem"
+      placeholder="SELECT CODIGO, DESCRICAO, PRECO_VENDA FROM ESTOQUE WHERE PRECO_VENDA > 100 ORDER BY PRECO_VENDA DESC"></textarea>
+    <p class="muted" style="margin:0.6rem 0 0">
+      Só <span class="chip">SELECT</span> e <span class="chip">WITH</span>, um comando por vez.
+      <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> e DDL são recusados.
+    </p>
+  </div>
+  <div class="card-foot">
+    <span class="muted" id="infoSql"></span>
+    <span class="spacer"></span>
+    <label class="muted" for="limiteSql">Máx.</label>
+    <input type="number" id="limiteSql" value="200" min="1" max="2000" style="width:6rem" />
+    <button type="button" class="small" id="btnExportarSql">Baixar CSV</button>
+    <button type="button" id="btnExecutar">Executar</button>
+  </div>
+  <div class="table-wrap">
+    <table id="tabelaSql">
+      <thead><tr><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td><div class="empty"><b>Nenhuma consulta ainda</b>Escreva um SELECT e clique em “Executar”.</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='consulta.js') }}"></script>
+{% endblock %}

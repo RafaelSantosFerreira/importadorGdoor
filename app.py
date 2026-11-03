@@ -5,6 +5,7 @@ import threading
 from flask import Flask, jsonify, render_template, request
 
 import progresso
+from consulta import buscar_estoque, executar_select
 from conexao_store import carregar as carregar_conexao
 from conexao_store import salvar as salvar_conexao
 from csv_origem import ler_cabecalho_e_amostra
@@ -34,6 +35,11 @@ def depara():
 @app.get("/importacao")
 def importacao():
     return render_template("importacao.html", ativo="importacao")
+
+
+@app.get("/consulta")
+def consulta():
+    return render_template("consulta.html", ativo="consulta")
 
 
 # ---- Conexão ----
@@ -146,6 +152,24 @@ def _iniciar_job(nome: str, mensagem: str, alvo) -> tuple[bool, str]:
         progresso.reset(nome, mensagem)
     threading.Thread(target=alvo, daemon=True).start()
     return True, "ok"
+
+
+@app.post("/api/consulta/estoque")
+def api_consulta_estoque():
+    payload = request.get_json(force=True) or {}
+    try:
+        return jsonify(buscar_estoque(payload.get("termo", ""), payload.get("limite")))
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 400
+
+
+@app.post("/api/consulta/sql")
+def api_consulta_sql():
+    payload = request.get_json(force=True) or {}
+    try:
+        return jsonify(executar_select(payload.get("sql", ""), payload.get("limite")))
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 400
 
 
 @app.get("/api/validacao-barras")
