@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}De-para — Migrador Gdoor{% endblock %}
+{% block heading %}De-para{% endblock %}
+{% block subtitle %}Para cada campo de ESTOQUE, escolha uma coluna do CSV ou um valor padrão.{% endblock %}
+{% block actions %}
+  <button type="button" id="btnSugerir">Aplicar sugestão</button>
+  <button type="button" class="ghost" id="btnLimpar">Limpar tudo</button>
+  <button type="button" class="primary" id="btnSalvar" title="Ctrl+S">Salvar mapeamento</button>
+{% endblock %}
+{% block status %}
+  <div id="status" class="status-bar busy" role="status" aria-live="polite">Carregando CSV e campos do banco…</div>
+{% endblock %}
+{% block content %}
+<div class="depara">
+  <section class="card sticky-col" aria-label="Colunas do CSV">
+    <div class="card-head">
+      <h2>Colunas do CSV</h2>
+      <span class="hint" id="metaOrigem">—</span>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="buscaOrigem" placeholder="Filtrar colunas…" />
+      <div class="segmented" id="filtroOrigem">
+        <button type="button" data-f="todas" aria-pressed="true">Todas</button>
+        <button type="button" data-f="livres" aria-pressed="false">Não usadas</button>
+      </div>
+    </div>
+    <div class="scroll"><div class="origem-list" id="listaOrigem"></div></div>
+  </section>
+
+  <section class="card" aria-label="Mapeamento">
+    <div class="card-head">
+      <h2>Campos de ESTOQUE <span class="hint" id="metaDestino"></span></h2>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>Coluna do CSV</span>
+        <span><i style="background:var(--warn)"></i>Valor padrão</span>
+        <span><i style="background:var(--danger)"></i>Obrigatório sem valor</span>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="buscaMap" placeholder="Filtrar campos…" />
+      <div class="segmented" id="filtroMap">
+        <button type="button" data-f="todos" aria-pressed="true">Todos <span class="count" id="cTodos"></span></button>
+        <button type="button" data-f="csv" aria-pressed="false">Do CSV <span class="count" id="cCsv"></span></button>
+        <button type="button" data-f="padrao" aria-pressed="false">Padrão <span class="count" id="cPadrao"></span></button>
+        <button type="button" data-f="vazios" aria-pressed="false">Sem valor <span class="count" id="cVazios"></span></button>
+      </div>
+    </div>
+    <div class="map-head">
+      <span>Campo</span>
+      <span>Coluna do CSV</span>
+      <span>Valor padrão (quando sem coluna)</span>
+    </div>
+    <div id="listaMap"></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='mapeamento.js') }}"></script>
+{% endblock %}

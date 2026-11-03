@@ -1,0 +1,15 @@
+# Dados locais / sensíveis
+conexao.json
+*.csv
+*.fdb
+*.FDB
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Ferramentas locais
+.claude/
+.DS_Store

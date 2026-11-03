@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Conexão — Migrador Gdoor{% endblock %}
+{% block page_class %}narrow{% endblock %}
+{% block heading %}Conexão{% endblock %}
+{% block subtitle %}Banco Firebird de destino e arquivo CSV de origem.{% endblock %}
+{% block actions %}
+  <button type="button" id="btnTestar">Testar conexão</button>
+  <button type="button" class="primary" id="btnSalvar" title="Ctrl+S">Salvar</button>
+{% endblock %}
+{% block status %}
+  <div id="status" class="status-bar busy" role="status" aria-live="polite">Carregando configuração…</div>
+{% endblock %}
+{% block content %}
+<form id="form" autocomplete="off" onsubmit="return false">
+  <section class="card">
+    <div class="card-head">
+      <h2>Firebird</h2>
+      <span class="hint">Destino · tabela ESTOQUE</span>
+    </div>
+    <div class="card-body form-grid">
+      <label class="field span-3"><span>Host</span>
+        <input id="host" type="text" placeholder="localhost" />
+      </label>
+      <label class="field span-1"><span>Porta</span>
+        <input id="port" type="number" min="1" max="65535" placeholder="3050" />
+      </label>
+      <label class="field span-4"><span>Arquivo do banco (.FDB)</span>
+        <input id="database" type="text" class="mono" placeholder="C:\Gdoor\DATAGES.FDB" />
+        <small>Caminho do arquivo como o servidor Firebird o enxerga.</small>
+      </label>
+      <label class="field span-2"><span>Usuário</span>
+        <input id="user" type="text" placeholder="SYSDBA" />
+      </label>
+      <div class="field span-2"><span>Senha</span>
+        <div class="input-group">
+          <input id="password" type="password" aria-label="Senha" />
+          <button type="button" id="btnVerSenha" aria-label="Mostrar senha">Mostrar</button>
+        </div>
+      </div>
+      <label class="field span-2"><span>Charset</span>
+        <input id="charset" type="text" list="charsets" placeholder="WIN1252" />
+      </label>
+    </div>
+  </section>
+
+  <section class="card" id="cardTeste" hidden style="margin-top:1rem">
+    <div class="card-head">
+      <h2>Resultado do teste</h2>
+      <span class="hint" id="testeQuando"></span>
+    </div>
+    <div class="card-body tiles">
+      <div class="tile"><span>Usuário</span><strong id="tUsuario">—</strong></div>
+      <div class="tile"><span>Tabelas</span><strong id="tTabelas">—</strong></div>
+      <div class="tile info"><span>Produtos em ESTOQUE</span><strong id="tEstoque">—</strong></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:1rem">
+    <div class="card-head">
+      <h2>Arquivo CSV</h2>
+      <span class="hint">Origem dos produtos</span>
+    </div>
+    <div class="card-body form-grid">
+      <label class="field span-4"><span>Caminho do CSV</span>
+        <input id="csv" type="text" class="mono" placeholder="C:\exportacao\produtos.csv" />
+      </label>
+      <label class="field span-2"><span>Encoding</span>
+        <input id="csv_encoding" type="text" list="encodings" placeholder="latin-1" />
+        <small>Exportação do Windows costuma ser latin-1.</small>
+      </label>
+      <label class="field span-2"><span>Delimitador</span>
+        <select id="csv_delimiter">
+          <option value=";">Ponto e vírgula ( ; )</option>
+          <option value=",">Vírgula ( , )</option>
+          <option value="&#9;">Tabulação</option>
+          <option value="|">Barra vertical ( | )</option>
+        </select>
+      </label>
+    </div>
+  </section>
+</form>
+
+<datalist id="charsets">
+  <option value="WIN1252"></option>
+  <option value="ISO8859_1"></option>
+  <option value="UTF8"></option>
+  <option value="NONE"></option>
+</datalist>
+<datalist id="encodings">
+  <option value="latin-1"></option>
+  <option value="cp1252"></option>
+  <option value="utf-8"></option>
+  <option value="utf-8-sig"></option>
+</datalist>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='conexao.js') }}"></script>
+{% endblock %}
