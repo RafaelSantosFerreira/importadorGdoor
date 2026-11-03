@@ -5,13 +5,21 @@ BASE_DIR = Path(__file__).resolve().parent
 # Firebird destino
 FB_HOST = "localhost"
 FB_PORT = 3050
-FB_DATABASE = r"F:\jorgeFb\DATAGES.FDB"
+FB_DATABASE = str(BASE_DIR / "db" / "DATAGES.FDB")
 FB_USER = "SYSDBA"
 FB_PASSWORD = "masterkey"
 FB_CHARSET = "WIN1252"
 
-# CSV origem padrão
-CSV_PADRAO = BASE_DIR / "produtos_20261103155732.csv"
+# CSV origem padrão: o .csv mais recente da pasta csv/
+CSV_DIR = BASE_DIR / "csv"
+
+
+def _csv_mais_recente() -> Path:
+    arquivos = sorted(CSV_DIR.glob("*.csv"), key=lambda a: a.stat().st_mtime, reverse=True)
+    return arquivos[0] if arquivos else CSV_DIR / "produtos.csv"
+
+
+CSV_PADRAO = _csv_mais_recente()
 CSV_ENCODING = "latin-1"
 CSV_DELIMITER = ";"
 
@@ -82,4 +90,10 @@ VALORES_PADRAO_SUGERIDOS = {
     "TIPO_ITEM": "00 Mercadoria para Revenda",
     "FAT_CONV": "1",
     "VENDA_FRACIONADA": "1",
+    # SMALLINT NOT NULL com DEFAULT 0 no ESTOQUE; toda a base usa 0
+    "VALIDADE": "0",
+    "FCP": "0",
+    "GERA_REPASSE": "0",
+    "M2": "0",
+    "USA_CODIGO_ATIVIDADE_NACIONAL": "0",
 }

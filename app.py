@@ -10,6 +10,7 @@ from conexao_store import carregar as carregar_conexao
 from conexao_store import salvar as salvar_conexao
 from csv_origem import ler_cabecalho_e_amostra
 from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
+from diferenca_preco import aplicar_diferencas_preco, buscar_diferencas_preco
 from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
 from mapeamento_store import salvar as salvar_mapeamento
@@ -153,7 +154,7 @@ def api_comparar():
             data = comparar_preco_estoque()
             progresso.finish({"ok": True, **data})
         except Exception as e:
-            progresso.finish(erro=str(e))
+            progresso.finish(erro=str(e) or type(e).__name__)
 
     ok, msg = _iniciar_job("comparar", "Iniciando comparação…", worker)
     if not ok:
@@ -181,10 +182,44 @@ def api_importar():
             )
             progresso.finish(data)
         except Exception as e:
-            progresso.finish(erro=str(e))
+            progresso.finish(erro=str(e) or type(e).__name__)
 
     titulo = "Simulando importação…" if dry_run else "Aplicando importação no banco…"
     ok, msg = _iniciar_job("importar", titulo, worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True, "dry_run": dry_run})
+
+
+@app.post("/api/preco/diferencas")
+def api_preco_diferencas():
+    """Só leitura: lista PRECO_VENDA <> prc_venda casando por id_identificador."""
+
+    def worker():
+        try:
+            progresso.finish(buscar_diferencas_preco())
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    ok, msg = _iniciar_job("dif_preco", "Buscando diferenças de preço…", worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True})
+
+
+@app.post("/api/preco/diferencas/aplicar")
+def api_preco_diferencas_aplicar():
+    payload = request.get_json(force=True) or {}
+    dry_run = bool(payload.get("dry_run", True))
+
+    def worker():
+        try:
+            progresso.finish(aplicar_diferencas_preco(dry_run=dry_run))
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    titulo = "Simulando preços do CSV…" if dry_run else "Gravando preços do CSV…"
+    ok, msg = _iniciar_job("dif_preco_aplicar", titulo, worker)
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True, "dry_run": dry_run})
@@ -199,7 +234,7 @@ def api_preco():
         try:
             progresso.finish(atualizar_somente_preco(dry_run=dry_run))
         except Exception as e:
-            progresso.finish(erro=str(e))
+            progresso.finish(erro=str(e) or type(e).__name__)
 
     titulo = "Simulando atualização de preços…" if dry_run else "Gravando preços…"
     ok, msg = _iniciar_job("preco", titulo, worker)

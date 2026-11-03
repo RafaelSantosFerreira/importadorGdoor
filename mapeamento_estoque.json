@@ -1,5 +1,5 @@
 {
-  "csv": "G:\\works\\migradorGdoor\\produtos_20261103155732.csv",
+  "csv": "C:\\works\\importadorGdoor\\csv\\produtos_20261103155732.csv",
   "tabela_destino": "ESTOQUE",
   "mapeamento": {
     "ALIQ_IPI": "ipi",
@@ -41,7 +41,12 @@
   },
   "valores_padrao": {
     "FAT_CONV": "1",
+    "FCP": "0",
+    "GERA_REPASSE": "0",
+    "M2": "0",
     "SITUACAO": "Ativo",
+    "USA_CODIGO_ATIVIDADE_NACIONAL": "0",
+    "VALIDADE": "0",
     "VENDA_FRACIONADA": "1"
   }
 }

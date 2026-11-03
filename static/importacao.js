@@ -4,7 +4,7 @@
 
   const tbody = document.querySelector("#tabelaLog tbody");
   const card = $("cardProgresso");
-  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnPrecoSimular", "btnPrecoAplicar"].map($);
+  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnPrecoSimular", "btnPrecoAplicar", "btnDifBuscar", "btnDifAplicar"].map($);
   const OPCOES = ["atualizar_preco", "atualizar_estoque", "atualizar_cadastro", "inserir_novos"];
 
   let pollTimer = null;
@@ -22,22 +22,29 @@
   }
   const chaveOpcoes = () => JSON.stringify(opcoes());
 
+  const ABAS = { comp: ["tabComp", "painelComp"], imp: ["tabImp", "painelImp"], dif: ["tabDif", "painelDif"] };
   function mostrarAba(qual) {
-    const comp = qual === "comp";
-    $("tabComp").setAttribute("aria-selected", String(comp));
-    $("tabImp").setAttribute("aria-selected", String(!comp));
-    $("painelComp").hidden = !comp;
-    $("painelImp").hidden = comp;
+    Object.entries(ABAS).forEach(([nome, [tab, painel]]) => {
+      const sel = nome === qual;
+      $(tab).setAttribute("aria-selected", String(sel));
+      $(painel).hidden = !sel;
+    });
   }
-  $("tabComp").addEventListener("click", () => mostrarAba("comp"));
-  $("tabImp").addEventListener("click", () => mostrarAba("imp"));
+  Object.entries(ABAS).forEach(([nome, [tab]]) =>
+    $(tab).addEventListener("click", () => mostrarAba(nome))
+  );
 
   // ---------- progresso ----------
   function renderProgresso(p) {
     const pct = Math.max(0, Math.min(100, Number(p.percent) || 0));
     card.hidden = false;
     const fim = p.done && !p.rodando && !p.erro;
-    const nome = { comparar: "Comparação", preco: "Atualização de preços" }[p.operacao] || "Importação";
+    const nome = {
+      comparar: "Comparação",
+      preco: "Atualização de preços",
+      dif_preco: "Busca de diferenças",
+      dif_preco_aplicar: "Atualização de preços",
+    }[p.operacao] || "Importação";
     $("progressMsg").textContent = fim ? `${nome} concluída` : p.mensagem || "…";
     $("progressPct").textContent = `${pct}%`;
     $("progressFill").style.width = `${pct}%`;
@@ -86,6 +93,8 @@
         const r = p.resultado || {};
         if (operacao === "comparar") concluirComparacao(r);
         else if (operacao === "preco") concluirPreco(r);
+        else if (operacao === "dif_preco") concluirDifBusca(r);
+        else if (operacao === "dif_preco_aplicar") concluirDifAplicar(r);
         else concluirImportacao(r, ctx);
         resolve(r);
       }, 400);
@@ -344,11 +353,155 @@
     }
   });
 
+  // ---------- diferenças de preço (id_identificador) ----------
+  const tbodyDif = document.querySelector("#tabelaDif tbody");
+  let itensDif = [];
+  let ultimaBuscaDif = null; // último resultado de "Buscar diferenças"
+
+  function statsDif(r) {
+    $("dTotal").textContent = fmt(r.linhas_csv);
+    $("dDif").textContent = fmt(r.diferentes);
+    $("dIguais").textContent = fmt(r.iguais);
+    $("dSemPreco").textContent = fmt(r.sem_preco);
+    $("dNaoAch").textContent = fmt(r.nao_encontrados);
+    $("dZera").textContent = fmt(r.zerariam);
+  }
+
+  function itensDifFiltrados() {
+    const q = $("buscaDif").value.trim().toLowerCase();
+    return itensDif.filter(
+      (r) => !q || r.codigo.toLowerCase().includes(q) || (r.descricao || "").toLowerCase().includes(q)
+    );
+  }
+
+  function renderDif() {
+    const items = itensDifFiltrados();
+    $("infoDif").textContent = itensDif.length
+      ? `${fmt(items.length)} de ${fmt(itensDif.length)} itens`
+      : "";
+    if (!items.length) {
+      tbodyDif.innerHTML = `<tr><td colspan="5"><div class="empty"><b>${
+        itensDif.length ? "Nada neste filtro" : "Nenhuma diferença de preço"
+      }</b>${
+        itensDif.length ? "Limpe a busca para ver todos." : "PRECO_VENDA do banco já bate com o CSV."
+      }</div></td></tr>`;
+      return;
+    }
+    tbodyDif.innerHTML = items
+      .map(
+        (r) => `<tr>
+          <td class="code">${esc(r.codigo)}</td>
+          <td>${esc(r.descricao)}</td>
+          <td class="num">${esc(r.preco_banco || "—")}</td>
+          <td class="num"><span class="diff">${esc(r.preco_csv || "—")}</span></td>
+          <td>${
+            r.zeraria
+              ? '<span class="tag ambos">zeraria — não grava</span>'
+              : '<span class="tag preco">atualiza</span>'
+          }</td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  function aplicarResultadoDif(r, banner) {
+    statsDif(r);
+    itensDif = r.itens || [];
+    $("toolbarDif").hidden = !itensDif.length;
+    renderDif();
+    $("bannerDif").innerHTML = banner
+      ? `<div class="banner ${banner[0]}" style="margin:1rem 1rem 0"><div><b>${esc(
+          banner[1]
+        )}</b><span>${esc(banner[2])}</span></div></div>`
+      : "";
+    const badge = $("difBadge");
+    badge.hidden = false;
+    badge.textContent = `${fmt(r.diferentes)} dif.`;
+    mostrarAba("dif");
+  }
+
+  function concluirDifBusca(r) {
+    ultimaBuscaDif = r;
+    aplicarResultadoDif(r, null);
+    const extra = r.truncado ? " A lista mostra só os primeiros itens." : "";
+    const zera = r.zerariam ? ` ${fmt(r.zerariam)} zerariam o preço e não serão gravados.` : "";
+    setStatus(
+      `${fmt(r.diferentes)} produto(s) com preço diferente de ${fmt(r.linhas_csv)} linhas.${zera}${extra}`,
+      r.diferentes ? "ok" : "ok"
+    );
+  }
+
+  function concluirDifAplicar(r) {
+    if (!r.dry_run && r.gravado) ultimaBuscaDif = null;
+    let banner;
+    if (r.dry_run) {
+      banner = r.erros
+        ? ["err", "Simulação com erros", "Nada foi gravado."]
+        : ["info", "Simulação concluída", "Nada foi gravado. Clique em “Atualizar preços do CSV” para gravar."];
+    } else if (r.gravado) {
+      banner = ["ok", "Preços gravados no banco", r.situacao || ""];
+    } else {
+      banner = ["err", "Nada foi gravado", r.situacao || ""];
+    }
+    aplicarResultadoDif(r, banner);
+    const resumo = `${fmt(r.atualizados)} preço(s) alterado(s), ${fmt(r.pulados_zero)} pulado(s) por zerarem, ${fmt(r.erros)} erro(s).`;
+    if (r.dry_run) setStatus(`Simulação: ${resumo}`, r.erros ? "err" : "ok");
+    else setStatus(r.gravado ? `Gravado: ${resumo}` : `Nada gravado: ${resumo}`, r.gravado ? "ok" : "err");
+  }
+
+  $("buscaDif").addEventListener("input", renderDif);
+  $("btnExportarDif").addEventListener("click", () => {
+    const cab = ["codigo", "descricao", "preco_banco", "preco_csv", "zeraria"];
+    baixarCsv(
+      `diferencas_preco_${new Date().toISOString().slice(0, 10)}.csv`,
+      [cab, ...itensDifFiltrados().map((r) => cab.map((k) => r[k]))]
+    );
+  });
+
+  $("btnDifBuscar").addEventListener("click", async () => {
+    setStatus("Buscando diferenças de preço…", "busy");
+    try {
+      await api("/api/preco/diferencas", { method: "POST" });
+      await acompanhar("dif_preco");
+    } catch (e) {
+      setBusy(false);
+      setStatus(`Erro ao buscar diferenças: ${e.message}`, "err");
+    }
+  });
+
+  async function rodarDifAplicar(dryRun) {
+    setStatus(dryRun ? "Simulando preços do CSV…" : "Gravando preços do CSV…", "busy");
+    try {
+      await api("/api/preco/diferencas/aplicar", { json: { dry_run: dryRun } });
+      await acompanhar("dif_preco_aplicar");
+    } catch (e) {
+      setBusy(false);
+      setStatus(`Erro ao atualizar preços: ${e.message}`, "err");
+    }
+  }
+
+  $("btnDifAplicar").addEventListener("click", () => {
+    const b = ultimaBuscaDif;
+    const info = b
+      ? `\n\nNa última busca: ${fmt(b.diferentes)} produto(s) com preço diferente` +
+        (b.zerariam ? `, dos quais ${fmt(b.zerariam)} não serão gravados por zerarem o preço` : "") +
+        "."
+      : "\n\n⚠ Você ainda não buscou as diferenças.";
+    const msg =
+      "Gravar PRECO_VENDA no Firebird agora?\n" +
+      "Casa por id_identificador e altera só o preço de venda." +
+      `${info}\n\nSe houver qualquer erro, nada será gravado.`;
+    if (confirm(msg)) rodarDifAplicar(false);
+  });
+
   // Mostra qual coluna do CSV alimenta o preço (de-para de PRECO_VENDA).
   api("/api/mapeamento")
     .then((m) => {
       const col = (m.mapeamento || {}).PRECO_VENDA;
-      if (col) $("colPreco").textContent = col;
+      if (col) {
+        $("colPreco").textContent = col;
+        $("colPrecoDif").textContent = col;
+      }
     })
     .catch(() => {});
 
@@ -358,7 +511,9 @@
     .then((p) => {
       if (p.rodando) {
         renderProgresso(p);
-        const op = ["comparar", "preco"].includes(p.operacao) ? p.operacao : "importar";
+        const op = ["comparar", "preco", "dif_preco", "dif_preco_aplicar"].includes(p.operacao)
+          ? p.operacao
+          : "importar";
         acompanhar(op).catch(() => {});
       }
     })

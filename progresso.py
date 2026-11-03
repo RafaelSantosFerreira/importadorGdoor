@@ -68,8 +68,8 @@ def finish(resultado: dict | None = None, erro: str | None = None) -> None:
         _state["done"] = True
         _state["resultado"] = resultado
         _state["erro"] = erro
-        if erro:
-            _state["mensagem"] = f"Erro: {erro}"
+        if erro is not None:
+            _state["mensagem"] = f"Erro: {erro}" if erro else "Erro: falha sem mensagem"
             _state["etapa"] = "erro"
         else:
             _state["percent"] = 100

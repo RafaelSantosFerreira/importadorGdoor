@@ -3,6 +3,12 @@ from __future__ import annotations
 import re
 
 import firebirdsql
+import firebirdsql.wireprotocol
+
+# O buffer padrão de 1024 bytes não comporta a descrição de um SELECT com
+# muitas colunas + muitos parâmetros; a continuação ("more describe vars")
+# quebra num assert contra o Firebird 5. Buffer maior evita a continuação.
+firebirdsql.wireprotocol.WireProtocol.buffer_length = 32768
 
 from config import CAMPOS_IGNORADOS
 from conexao_store import carregar as carregar_conexao
