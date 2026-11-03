@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Importação — Migrador Gdoor{% endblock %}
 {% block heading %}Importação{% endblock %}
-{% block subtitle %}Compare, simule e aplique o CSV na tabela ESTOQUE.{% endblock %}
+{% block subtitle %}Compare o CSV com a tabela ESTOQUE e aplique preço e saldo.{% endblock %}
 {% block status %}
-  <div id="status" class="status-bar" role="status" aria-live="polite">Escolha o que atualizar, compare e simule antes de aplicar.</div>
+  <div id="status" class="status-bar" role="status" aria-live="polite">Busque as diferenças e simule antes de gravar.</div>
 {% endblock %}
 {% block content %}
 <section class="card">
@@ -92,45 +92,6 @@
   </div>
 </section>
 
-<section class="card">
-  <div class="card-head">
-    <h2>Importação completa</h2>
-    <span class="hint">Valores vazios no CSV nunca apagam dados do banco; preço zero não zera.</span>
-  </div>
-  <div class="card-body options">
-    <label class="option">
-      <input type="checkbox" id="atualizar_preco" checked />
-      <span><b>Atualizar preços</b>
-        <small><code>PRECO_VENDA</code> <code>PRECO_CUSTO</code> <code>PRECO_ATACADO</code> <code>CUSTO_MEDIO</code></small>
-      </span>
-    </label>
-    <label class="option">
-      <input type="checkbox" id="atualizar_estoque" checked />
-      <span><b>Atualizar quantidades</b>
-        <small><code>QTD</code> <code>QTD_DISPONIVEL</code> <code>QTD_INICIAL</code></small>
-      </span>
-    </label>
-    <label class="option">
-      <input type="checkbox" id="atualizar_cadastro" />
-      <span><b>Atualizar cadastro dos existentes</b>
-        <small>Descrição, código de barras, NCM e demais campos mapeados do CSV.</small>
-      </span>
-    </label>
-    <label class="option">
-      <input type="checkbox" id="inserir_novos" checked />
-      <span><b>Inserir produtos novos</b>
-        <small>Códigos que ainda não existem no banco.</small>
-      </span>
-    </label>
-  </div>
-  <div class="card-foot">
-    <button type="button" id="btnComparar">Comparar diferenças</button>
-    <span class="spacer"></span>
-    <button type="button" id="btnDryRun">Simular importação</button>
-    <button type="button" class="danger" id="btnAplicar">Aplicar no banco</button>
-  </div>
-</section>
-
 <section class="card" id="cardProgresso" hidden>
   <div class="card-body">
     <div class="progress-meta">
@@ -146,56 +107,12 @@
 
 <section class="card">
   <div class="tabs" role="tablist">
-    <button type="button" role="tab" id="tabComp" aria-selected="true" aria-controls="painelComp">Comparação</button>
-    <button type="button" role="tab" id="tabImp" aria-selected="false" aria-controls="painelImp">Resultado da importação <span class="count" id="impBadge" hidden></span></button>
-    <button type="button" role="tab" id="tabDif" aria-selected="false" aria-controls="painelDif">Diferenças de preço <span class="count" id="difBadge" hidden></span></button>
+    <button type="button" role="tab" id="tabDif" aria-selected="true" aria-controls="painelDif">Diferenças de preço <span class="count" id="difBadge" hidden></span></button>
     <button type="button" role="tab" id="tabSal" aria-selected="false" aria-controls="painelSal">Diferenças de saldo <span class="count" id="salBadge" hidden></span></button>
     <button type="button" role="tab" id="tabFalta" aria-selected="false" aria-controls="painelFalta">Faltando no banco <span class="count" id="faltaBadge" hidden></span></button>
   </div>
 
-  <div id="painelComp" role="tabpanel" aria-labelledby="tabComp">
-    <div class="card-body tiles" id="stats">
-      <button type="button" class="tile" data-tipo="" disabled><span>Linhas no CSV</span><strong id="sTotal">—</strong></button>
-      <button type="button" class="tile" disabled><span>Iguais</span><strong id="sIguais">—</strong></button>
-      <button type="button" class="tile ok" data-tipo="NOVO" disabled><span>Novos</span><strong id="sNovos">—</strong></button>
-      <button type="button" class="tile warn" data-tipo="PRECO" disabled><span>Só preço</span><strong id="sPreco">—</strong></button>
-      <button type="button" class="tile info" data-tipo="ESTOQUE" disabled><span>Só quantidade</span><strong id="sEstoque">—</strong></button>
-      <button type="button" class="tile danger" data-tipo="PRECO+ESTOQUE" disabled><span>Preço e quantidade</span><strong id="sAmbos">—</strong></button>
-    </div>
-    <div class="toolbar" id="toolbarLog" hidden>
-      <input type="search" id="buscaLog" placeholder="Buscar código ou descrição…" />
-      <span class="muted" id="infoLog"></span>
-      <span class="spacer"></span>
-      <button type="button" class="small" id="btnExportar">Baixar CSV</button>
-    </div>
-    <div class="table-wrap">
-      <table id="tabelaLog">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Descrição</th>
-            <th>Tipo</th>
-            <th class="num">Preço banco</th>
-            <th class="num">Preço CSV</th>
-            <th class="num">Qtd banco</th>
-            <th class="num">Qtd CSV</th>
-            <th>Detalhe</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="8"><div class="empty"><b>Nenhuma comparação ainda</b>Clique em “Comparar diferenças” para ver o que vai mudar.</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div id="painelImp" role="tabpanel" aria-labelledby="tabImp" hidden>
-    <div class="card-body" id="resultadoImp">
-      <div class="empty"><b>Nenhuma importação rodada</b>Use “Simular importação” primeiro: nada é gravado.</div>
-    </div>
-  </div>
-
-  <div id="painelDif" role="tabpanel" aria-labelledby="tabDif" hidden>
+  <div id="painelDif" role="tabpanel" aria-labelledby="tabDif">
     <div id="bannerDif"></div>
     <div class="card-body tiles">
       <div class="tile"><span>Linhas no CSV</span><strong id="dTotal">—</strong></div>

@@ -5,7 +5,6 @@ import threading
 from flask import Flask, jsonify, render_template, request
 
 import progresso
-from comparar import comparar_preco_estoque
 from conexao_store import carregar as carregar_conexao
 from conexao_store import salvar as salvar_conexao
 from csv_origem import ler_cabecalho_e_amostra
@@ -15,7 +14,6 @@ from diferenca_saldo import aplicar_diferencas_saldo, buscar_diferencas_saldo
 from faltantes import buscar_faltantes
 from validacao_barras import definir as definir_validacao
 from validacao_barras import status as status_validacao
-from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
 from mapeamento_store import salvar as salvar_mapeamento
 
@@ -148,50 +146,6 @@ def _iniciar_job(nome: str, mensagem: str, alvo) -> tuple[bool, str]:
         progresso.reset(nome, mensagem)
     threading.Thread(target=alvo, daemon=True).start()
     return True, "ok"
-
-
-@app.post("/api/comparar")
-def api_comparar():
-    def worker():
-        try:
-            data = comparar_preco_estoque()
-            progresso.finish({"ok": True, **data})
-        except Exception as e:
-            progresso.finish(erro=str(e) or type(e).__name__)
-
-    ok, msg = _iniciar_job("comparar", "Iniciando comparação…", worker)
-    if not ok:
-        return jsonify({"ok": False, "erro": msg}), 409
-    return jsonify({"ok": True, "started": True})
-
-
-@app.post("/api/importar")
-def api_importar():
-    payload = request.get_json(force=True) or {}
-    atualizar_preco = bool(payload.get("atualizar_preco", True))
-    atualizar_estoque = bool(payload.get("atualizar_estoque", True))
-    atualizar_cadastro = bool(payload.get("atualizar_cadastro", False))
-    inserir_novos = bool(payload.get("inserir_novos", True))
-    dry_run = bool(payload.get("dry_run", True))
-
-    def worker():
-        try:
-            data = importar(
-                atualizar_preco=atualizar_preco,
-                atualizar_estoque=atualizar_estoque,
-                atualizar_cadastro=atualizar_cadastro,
-                inserir_novos=inserir_novos,
-                dry_run=dry_run,
-            )
-            progresso.finish(data)
-        except Exception as e:
-            progresso.finish(erro=str(e) or type(e).__name__)
-
-    titulo = "Simulando importação…" if dry_run else "Aplicando importação no banco…"
-    ok, msg = _iniciar_job("importar", titulo, worker)
-    if not ok:
-        return jsonify({"ok": False, "erro": msg}), 409
-    return jsonify({"ok": True, "started": True, "dry_run": dry_run})
 
 
 @app.get("/api/validacao-barras")
