@@ -109,10 +109,14 @@
   }
 
   // ---- selects ----
+  // Ordem alfabética só no combo; a lista da esquerda segue a ordem do CSV.
+  const porNome = (a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR", { numeric: true, sensitivity: "base" });
+
   function opcoesOrigem(selecionado) {
     const usados = new Set(Object.values(state.mapeamento).filter(Boolean));
     const opts = ['<option value="">— nenhuma —</option>'];
-    for (const c of state.colunas) {
+    for (const c of [...state.colunas].sort(porNome)) {
       const s = c.nome === selecionado ? " selected" : "";
       const emUso = usados.has(c.nome) && c.nome !== selecionado ? "  (já usada)" : "";
       opts.push(`<option value="${esc(c.nome)}"${s}>${esc(c.nome)}${emUso}</option>`);
