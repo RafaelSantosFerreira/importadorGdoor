@@ -37,16 +37,19 @@
     "TIPO_ITEM": "tipo_item",
     "ULTIMA_COMPRA": "ult_compra",
     "ULTIMA_VENDA": "utl_venda",
-    "UND": "uni_medida"
+    "UND": "uni_medida",
+    "FCP": "pfcp",
+    "COD_CEST": "cofBenef",
+    "QTD_SALDO": "qtd_atual"
   },
   "valores_padrao": {
     "FAT_CONV": "1",
-    "FCP": "0",
     "GERA_REPASSE": "0",
     "M2": "0",
     "SITUACAO": "Ativo",
     "USA_CODIGO_ATIVIDADE_NACIONAL": "0",
-    "VALIDADE": "0",
-    "VENDA_FRACIONADA": "1"
+    "VALIDADE": "7",
+    "VENDA_FRACIONADA": "1",
+    "ID_GRUPO": "1"
   }
 }
