@@ -4,7 +4,8 @@
 
   const tbody = document.querySelector("#tabelaLog tbody");
   const card = $("cardProgresso");
-  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnDifBuscar", "btnDifSimular", "btnDifAplicar", "btnFaltantes"].map($);
+  const botoes = ["btnComparar", "btnDryRun", "btnAplicar", "btnDifBuscar", "btnDifSimular", "btnDifAplicar",
+                  "btnSalBuscar", "btnSalSimular", "btnSalAplicar", "btnFaltantes"].map($);
   const OPCOES = ["atualizar_preco", "atualizar_estoque", "atualizar_cadastro", "inserir_novos"];
 
   let pollTimer = null;
@@ -26,6 +27,7 @@
     comp: ["tabComp", "painelComp"],
     imp: ["tabImp", "painelImp"],
     dif: ["tabDif", "painelDif"],
+    sal: ["tabSal", "painelSal"],
     falta: ["tabFalta", "painelFalta"],
   };
   function mostrarAba(qual) {
@@ -47,6 +49,8 @@
     const nome = {
       comparar: "Comparação",
       dif_preco: "Busca de diferenças",
+      dif_saldo: "Busca de diferenças",
+      dif_saldo_aplicar: "Atualização de saldo",
       faltantes: "Busca de faltantes",
       dif_preco_aplicar: "Atualização de preços",
     }[p.operacao] || "Importação";
@@ -97,9 +101,11 @@
         }
         const r = p.resultado || {};
         if (operacao === "comparar") concluirComparacao(r);
-        else if (operacao === "dif_preco") concluirDifBusca(r);
+        else if (operacao === "dif_preco") painelPreco.concluirBusca(r);
+        else if (operacao === "dif_preco_aplicar") painelPreco.concluirAplicar(r);
+        else if (operacao === "dif_saldo") painelSaldo.concluirBusca(r);
+        else if (operacao === "dif_saldo_aplicar") painelSaldo.concluirAplicar(r);
         else if (operacao === "faltantes") concluirFaltantes(r);
-        else if (operacao === "dif_preco_aplicar") concluirDifAplicar(r);
         else concluirImportacao(r, ctx);
         resolve(r);
       }, 400);
@@ -288,147 +294,182 @@
     if (confirm(msg)) rodarImportacao(false);
   });
 
-  // ---------- diferenças de preço (id_identificador) ----------
-  const tbodyDif = document.querySelector("#tabelaDif tbody");
-  let itensDif = [];
-  let ultimaBuscaDif = null; // último resultado de "Buscar diferenças"
+  // ---------- diferenças de um campo (preço, saldo) ----------
+  // Mesma tela para os dois: muda o campo gravado, os ids e os textos.
+  function criarPainelDiferenca(cfg) {
+    const tbody = document.querySelector("#" + cfg.tabela + " tbody");
+    let itens = [];
+    let ultimaBusca = null;
 
-  function statsDif(r) {
-    $("dTotal").textContent = fmt(r.linhas_csv);
-    $("dDif").textContent = fmt(r.diferentes);
-    $("dIguais").textContent = fmt(r.iguais);
-    $("dSemPreco").textContent = fmt(r.sem_preco);
-    $("dNaoAch").textContent = fmt(r.nao_encontrados);
-    $("dZera").textContent = fmt(r.zerariam);
-  }
+    const filtrados = () => {
+      const q = $(cfg.busca).value.trim().toLowerCase();
+      return itens.filter(
+        (r) => !q || r.codigo.toLowerCase().includes(q) || (r.descricao || "").toLowerCase().includes(q)
+      );
+    };
 
-  function itensDifFiltrados() {
-    const q = $("buscaDif").value.trim().toLowerCase();
-    return itensDif.filter(
-      (r) => !q || r.codigo.toLowerCase().includes(q) || (r.descricao || "").toLowerCase().includes(q)
-    );
-  }
-
-  function renderDif() {
-    const items = itensDifFiltrados();
-    $("infoDif").textContent = itensDif.length
-      ? `${fmt(items.length)} de ${fmt(itensDif.length)} itens`
-      : "";
-    if (!items.length) {
-      tbodyDif.innerHTML = `<tr><td colspan="5"><div class="empty"><b>${
-        itensDif.length ? "Nada neste filtro" : "Nenhuma diferença de preço"
-      }</b>${
-        itensDif.length ? "Limpe a busca para ver todos." : "PRECO_VENDA do banco já bate com o CSV."
-      }</div></td></tr>`;
-      return;
+    function render() {
+      const items = filtrados();
+      $(cfg.info).textContent = itens.length ? `${fmt(items.length)} de ${fmt(itens.length)} itens` : "";
+      if (!items.length) {
+        const titulo = itens.length ? "Nada neste filtro" : `Nenhuma diferença de ${cfg.rotulo}`;
+        const texto = itens.length
+          ? "Limpe a busca para ver todos."
+          : `${cfg.campo} do banco já bate com o CSV.`;
+        tbody.innerHTML =
+          `<tr><td colspan="5"><div class="empty"><b>${esc(titulo)}</b>${esc(texto)}</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = items
+        .map((r) => {
+          const tag = r.bloqueado
+            ? `<span class="tag ambos">${esc(r.motivo)}</span>`
+            : `<span class="tag preco">atualiza</span>`;
+          return `<tr>
+            <td class="code">${esc(r.codigo)}</td>
+            <td>${esc(r.descricao)}</td>
+            <td class="num">${esc(r.valor_banco || "—")}</td>
+            <td class="num"><span class="diff">${esc(r.valor_csv || "—")}</span></td>
+            <td>${tag}</td>
+          </tr>`;
+        })
+        .join("");
     }
-    tbodyDif.innerHTML = items
-      .map(
-        (r) => `<tr>
-          <td class="code">${esc(r.codigo)}</td>
-          <td>${esc(r.descricao)}</td>
-          <td class="num">${esc(r.preco_banco || "—")}</td>
-          <td class="num"><span class="diff">${esc(r.preco_csv || "—")}</span></td>
-          <td>${
-            r.zeraria
-              ? '<span class="tag ambos">zeraria — não grava</span>'
-              : '<span class="tag preco">atualiza</span>'
-          }</td>
-        </tr>`
-      )
-      .join("");
-  }
 
-  function aplicarResultadoDif(r, banner) {
-    statsDif(r);
-    itensDif = r.itens || [];
-    $("toolbarDif").hidden = !itensDif.length;
-    renderDif();
-    $("bannerDif").innerHTML = banner
-      ? `<div class="banner ${banner[0]}" style="margin:1rem 1rem 0"><div><b>${esc(
-          banner[1]
-        )}</b><span>${esc(banner[2])}</span></div></div>`
-      : "";
-    const badge = $("difBadge");
-    badge.hidden = false;
-    badge.textContent = `${fmt(r.diferentes)} dif.`;
-    mostrarAba("dif");
-  }
-
-  function concluirDifBusca(r) {
-    ultimaBuscaDif = r;
-    aplicarResultadoDif(r, null);
-    const extra = r.truncado ? " A lista mostra só os primeiros itens." : "";
-    const zera = r.zerariam ? ` ${fmt(r.zerariam)} zerariam o preço e não serão gravados.` : "";
-    setStatus(
-      `${fmt(r.diferentes)} produto(s) com preço diferente de ${fmt(r.linhas_csv)} linhas.${zera}${extra}`,
-      r.diferentes ? "ok" : "ok"
-    );
-  }
-
-  function concluirDifAplicar(r) {
-    if (!r.dry_run && r.gravado) ultimaBuscaDif = null;
-    let banner;
-    if (r.dry_run) {
-      banner = r.erros
-        ? ["err", "Simulação com erros", "Nada foi gravado."]
-        : ["info", "Simulação concluída", "Tudo foi executado e desfeito. Nada foi gravado. Se estiver certo, clique em “Gravar preços”."];
-    } else if (r.gravado) {
-      banner = ["ok", "Preços gravados no banco", r.situacao || ""];
-    } else {
-      banner = ["err", "Nada foi gravado", r.situacao || ""];
+    function aplicarResultado(r, banner) {
+      $(cfg.tTotal).textContent = fmt(r.linhas_csv);
+      $(cfg.tDif).textContent = fmt(r.diferentes);
+      $(cfg.tIguais).textContent = fmt(r.iguais);
+      $(cfg.tSemValor).textContent = fmt(r.sem_valor);
+      $(cfg.tNaoAch).textContent = fmt(r.nao_encontrados);
+      $(cfg.tBloq).textContent = fmt(r.bloqueados);
+      itens = r.itens || [];
+      $(cfg.toolbar).hidden = !itens.length;
+      render();
+      $(cfg.banner).innerHTML = banner
+        ? `<div class="banner ${banner[0]}" style="margin:1rem 1rem 0"><div><b>${esc(
+            banner[1]
+          )}</b><span>${esc(banner[2])}</span></div></div>`
+        : "";
+      const badge = $(cfg.badge);
+      badge.hidden = false;
+      badge.textContent = `${fmt(r.diferentes)} dif.`;
+      mostrarAba(cfg.aba);
     }
-    aplicarResultadoDif(r, banner);
-    const resumo = `${fmt(r.atualizados)} preço(s) alterado(s), ${fmt(r.pulados_zero)} pulado(s) por zerarem, ${fmt(r.erros)} erro(s).`;
-    if (r.dry_run) setStatus(`Simulação: ${resumo}`, r.erros ? "err" : "ok");
-    else setStatus(r.gravado ? `Gravado: ${resumo}` : `Nada gravado: ${resumo}`, r.gravado ? "ok" : "err");
+
+    function concluirBusca(r) {
+      ultimaBusca = r;
+      aplicarResultado(r, null);
+      const extra = r.truncado ? " A lista mostra só os primeiros itens." : "";
+      const bloq = r.bloqueados ? ` ${fmt(r.bloqueados)} não serão gravados (${cfg.motivoCurto}).` : "";
+      setStatus(
+        `${fmt(r.diferentes)} produto(s) com ${cfg.rotulo} diferente de ${fmt(r.linhas_csv)} linhas.${bloq}${extra}`,
+        "ok"
+      );
+    }
+
+    function concluirAplicar(r) {
+      if (!r.dry_run && r.gravado) ultimaBusca = null;
+      let banner;
+      if (r.dry_run) {
+        banner = r.erros
+          ? ["err", "Simulação com erros", "Nada foi gravado. Veja os erros listados abaixo."]
+          : [
+              "info",
+              "Simulação concluída",
+              `Tudo foi executado e desfeito. Nada foi gravado. Se estiver certo, clique em “${cfg.rotuloGravar}”.`,
+            ];
+      } else if (r.gravado) {
+        banner = ["ok", "Gravado no banco", r.situacao || ""];
+      } else {
+        banner = ["err", "Nada foi gravado", r.situacao || ""];
+      }
+      aplicarResultado(r, banner);
+      if (r.erros && (r.log || []).length) {
+        const linhas = (r.log || [])
+          .slice(0, 20)
+          .map((l) => `<div class="${l.startsWith("ERRO") ? "l-erro" : "l-update"}">${esc(l)}</div>`)
+          .join("");
+        $(cfg.banner).innerHTML += `<div class="log-box" style="margin:0.6rem 1rem 0">${linhas}</div>`;
+      }
+      const resumo = `${fmt(r.atualizados)} alterado(s), ${fmt(r.pulados)} pulado(s), ${fmt(r.erros)} erro(s).`;
+      if (r.dry_run) setStatus(`Simulação: ${resumo}`, r.erros ? "err" : "ok");
+      else setStatus(r.gravado ? `Gravado: ${resumo}` : `Nada gravado: ${resumo}`, r.gravado ? "ok" : "err");
+    }
+
+    async function rodarAplicar(dryRun) {
+      setStatus(dryRun ? `Simulando ${cfg.rotulo} do CSV…` : `Gravando ${cfg.rotulo} do CSV…`, "busy");
+      try {
+        await api(cfg.endpointAplicar, { json: { dry_run: dryRun } });
+        await acompanhar(cfg.opAplicar);
+      } catch (e) {
+        setBusy(false);
+        setStatus(`Erro ao atualizar ${cfg.rotulo}: ${e.message}`, "err");
+      }
+    }
+
+    $(cfg.busca).addEventListener("input", render);
+    $(cfg.exportar).addEventListener("click", () => {
+      const cab = ["codigo", "descricao", "valor_banco", "valor_csv", "bloqueado", "motivo"];
+      baixarCsv(cfg.arquivo + "_" + new Date().toISOString().slice(0, 10) + ".csv", [
+        cab,
+        ...filtrados().map((r) => cab.map((k) => r[k])),
+      ]);
+    });
+
+    $(cfg.btnBuscar).addEventListener("click", async () => {
+      setStatus(`Buscando diferenças de ${cfg.rotulo}…`, "busy");
+      try {
+        await api(cfg.endpointBuscar, { method: "POST" });
+        await acompanhar(cfg.opBuscar);
+      } catch (e) {
+        setBusy(false);
+        setStatus(`Erro ao buscar diferenças: ${e.message}`, "err");
+      }
+    });
+
+    $(cfg.btnSimular).addEventListener("click", () => rodarAplicar(true));
+
+    $(cfg.btnAplicar).addEventListener("click", () => {
+      const b = ultimaBusca;
+      const bloqueio = b && b.bloqueados
+        ? `, dos quais ${fmt(b.bloqueados)} não serão gravados (${cfg.motivoCurto})`
+        : "";
+      const info = b
+        ? `\n\nNa última busca: ${fmt(b.diferentes)} produto(s) diferentes${bloqueio}.`
+        : "\n\n⚠ Você ainda não buscou as diferenças.";
+      const msg =
+        `Gravar ${cfg.campo} no Firebird agora?\n` +
+        `Casa cast(CODIGO as int) = cast(id_identificador as int) e altera só ${cfg.campo}.` +
+        `${info}\n\nSe houver qualquer erro, nada será gravado.`;
+      if (confirm(msg)) rodarAplicar(false);
+    });
+
+    return { concluirBusca, concluirAplicar };
   }
 
-  $("buscaDif").addEventListener("input", renderDif);
-  $("btnExportarDif").addEventListener("click", () => {
-    const cab = ["codigo", "descricao", "preco_banco", "preco_csv", "zeraria"];
-    baixarCsv(
-      `diferencas_preco_${new Date().toISOString().slice(0, 10)}.csv`,
-      [cab, ...itensDifFiltrados().map((r) => cab.map((k) => r[k]))]
-    );
+  const painelPreco = criarPainelDiferenca({
+    aba: "dif", campo: "PRECO_VENDA", rotulo: "preço", rotuloGravar: "Gravar preços",
+    motivoCurto: "zerariam o preço", arquivo: "diferencas_preco",
+    tabela: "tabelaDif", busca: "buscaDif", info: "infoDif", toolbar: "toolbarDif",
+    badge: "difBadge", banner: "bannerDif", exportar: "btnExportarDif",
+    tTotal: "dTotal", tDif: "dDif", tIguais: "dIguais", tSemValor: "dSemValor",
+    tNaoAch: "dNaoAch", tBloq: "dZera",
+    btnBuscar: "btnDifBuscar", btnSimular: "btnDifSimular", btnAplicar: "btnDifAplicar",
+    endpointBuscar: "/api/preco/diferencas", endpointAplicar: "/api/preco/diferencas/aplicar",
+    opBuscar: "dif_preco", opAplicar: "dif_preco_aplicar",
   });
 
-  $("btnDifBuscar").addEventListener("click", async () => {
-    setStatus("Buscando diferenças de preço…", "busy");
-    try {
-      await api("/api/preco/diferencas", { method: "POST" });
-      await acompanhar("dif_preco");
-    } catch (e) {
-      setBusy(false);
-      setStatus(`Erro ao buscar diferenças: ${e.message}`, "err");
-    }
-  });
-
-  async function rodarDifAplicar(dryRun) {
-    setStatus(dryRun ? "Simulando preços do CSV…" : "Gravando preços do CSV…", "busy");
-    try {
-      await api("/api/preco/diferencas/aplicar", { json: { dry_run: dryRun } });
-      await acompanhar("dif_preco_aplicar");
-    } catch (e) {
-      setBusy(false);
-      setStatus(`Erro ao atualizar preços: ${e.message}`, "err");
-    }
-  }
-
-  $("btnDifSimular").addEventListener("click", () => rodarDifAplicar(true));
-
-  $("btnDifAplicar").addEventListener("click", () => {
-    const b = ultimaBuscaDif;
-    const info = b
-      ? `\n\nNa última busca: ${fmt(b.diferentes)} produto(s) com preço diferente` +
-        (b.zerariam ? `, dos quais ${fmt(b.zerariam)} não serão gravados por zerarem o preço` : "") +
-        "."
-      : "\n\n⚠ Você ainda não buscou as diferenças.";
-    const msg =
-      "Gravar PRECO_VENDA no Firebird agora?\n" +
-      "Casa cast(CODIGO as int) = cast(id_identificador as int) e altera só o preço de venda." +
-      `${info}\n\nSe houver qualquer erro, nada será gravado.`;
-    if (confirm(msg)) rodarDifAplicar(false);
+  const painelSaldo = criarPainelDiferenca({
+    aba: "sal", campo: "QTD_SALDO", rotulo: "saldo", rotuloGravar: "Gravar saldo",
+    motivoCurto: "saldo negativo", arquivo: "diferencas_saldo",
+    tabela: "tabelaSal", busca: "buscaSal", info: "infoSal", toolbar: "toolbarSal",
+    badge: "salBadge", banner: "bannerSal", exportar: "btnExportarSal",
+    tTotal: "qTotal", tDif: "qDif", tIguais: "qIguais", tSemValor: "qSemValor",
+    tNaoAch: "qNaoAch", tBloq: "qBloq",
+    btnBuscar: "btnSalBuscar", btnSimular: "btnSalSimular", btnAplicar: "btnSalAplicar",
+    endpointBuscar: "/api/saldo/diferencas", endpointAplicar: "/api/saldo/diferencas/aplicar",
+    opBuscar: "dif_saldo", opAplicar: "dif_saldo_aplicar",
   });
 
   // ---------- faltando no banco ----------
@@ -512,6 +553,8 @@
     .then((m) => {
       const col = (m.mapeamento || {}).PRECO_VENDA;
       if (col) $("colPrecoDif").textContent = col;
+      const colQtd = (m.mapeamento || {}).QTD_SALDO;
+      if (colQtd) $("colSaldo").textContent = colQtd;
     })
     .catch(() => {});
 
@@ -521,7 +564,7 @@
     .then((p) => {
       if (p.rodando) {
         renderProgresso(p);
-        const op = ["comparar", "dif_preco", "dif_preco_aplicar", "faltantes"].includes(p.operacao)
+        const op = ["comparar", "dif_preco", "dif_preco_aplicar", "dif_saldo", "dif_saldo_aplicar", "faltantes"].includes(p.operacao)
           ? p.operacao
           : "importar";
         acompanhar(op).catch(() => {});

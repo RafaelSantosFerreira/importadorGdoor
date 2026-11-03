@@ -11,6 +11,7 @@ from conexao_store import salvar as salvar_conexao
 from csv_origem import ler_cabecalho_e_amostra
 from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
 from diferenca_preco import aplicar_diferencas_preco, buscar_diferencas_preco
+from diferenca_saldo import aplicar_diferencas_saldo, buscar_diferencas_saldo
 from faltantes import buscar_faltantes
 from importar_service import importar
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
@@ -186,6 +187,40 @@ def api_importar():
 
     titulo = "Simulando importação…" if dry_run else "Aplicando importação no banco…"
     ok, msg = _iniciar_job("importar", titulo, worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True, "dry_run": dry_run})
+
+
+@app.post("/api/saldo/diferencas")
+def api_saldo_diferencas():
+    """Só leitura: lista QTD_SALDO <> qtd_atual casando por id_identificador."""
+
+    def worker():
+        try:
+            progresso.finish(buscar_diferencas_saldo())
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    ok, msg = _iniciar_job("dif_saldo", "Buscando diferenças de saldo…", worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True})
+
+
+@app.post("/api/saldo/diferencas/aplicar")
+def api_saldo_diferencas_aplicar():
+    payload = request.get_json(force=True) or {}
+    dry_run = bool(payload.get("dry_run", True))
+
+    def worker():
+        try:
+            progresso.finish(aplicar_diferencas_saldo(dry_run=dry_run))
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    titulo = "Simulando saldo do CSV…" if dry_run else "Gravando saldo do CSV…"
+    ok, msg = _iniciar_job("dif_saldo_aplicar", titulo, worker)
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True, "dry_run": dry_run})
