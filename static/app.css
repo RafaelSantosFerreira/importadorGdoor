@@ -536,6 +536,8 @@ tbody tr:hover td { background: var(--surface-2); }
 .banner.ok b { color: var(--ok); }
 .banner.info { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .banner.info b { color: var(--accent); }
+.banner.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.banner.warn b { color: var(--warn); }
 .banner.err { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
 .banner.err b { color: var(--danger); }
 

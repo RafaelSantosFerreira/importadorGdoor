@@ -180,7 +180,13 @@
 
     function concluirAplicar(r) {
       if (r.gravado) ultimaBusca = null;
-      const banner = r.gravado
+      // COMMIT de zero linha nao e "gravado": todo mundo estava bloqueado.
+      const nada = r.gravado && !r.atualizados && r.pulados;
+      const banner = nada
+        ? ["warn", "Nada a gravar",
+           `Os ${fmt(r.pulados)} produto(s) diferentes estao bloqueados (${cfg.motivoCurto}); ` +
+           `o banco continua como estava.`]
+        : r.gravado
         ? ["ok", "Gravado no banco", r.situacao || ""]
         : ["err", "Nada foi gravado", r.situacao || ""];
       aplicarResultado(r, banner);
@@ -192,7 +198,8 @@
         $(cfg.banner).innerHTML += `<div class="log-box" style="margin:0.6rem 1rem 0">${linhas}</div>`;
       }
       const resumo = `${fmt(r.atualizados)} alterado(s), ${fmt(r.pulados)} pulado(s), ${fmt(r.erros)} erro(s).`;
-      setStatus(r.gravado ? `Gravado: ${resumo}` : `Nada gravado: ${resumo}`, r.gravado ? "ok" : "err");
+      const rotulo = nada ? "Nada a gravar" : r.gravado ? "Gravado" : "Nada gravado";
+      setStatus(`${rotulo}: ${resumo}`, nada ? "warn" : r.gravado ? "ok" : "err");
     }
 
     async function rodarAplicar() {

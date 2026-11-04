@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Consulta — Migrador Gdoor{% endblock %}
 {% block heading %}Consulta{% endblock %}
-{% block subtitle %}Busque no ESTOQUE ou rode um SELECT. Nada aqui grava no banco.{% endblock %}
+{% block subtitle %}Busque no ESTOQUE, rode um SELECT ou ajuste o saldo de um produto.{% endblock %}
 {% block status %}
   <div id="status" class="status-bar" role="status" aria-live="polite">Busque por código, código de barras ou descrição.</div>
 {% endblock %}
@@ -35,6 +35,32 @@
         <tr><td><div class="empty"><b>Nenhuma busca ainda</b>Digite algo e clique em “Buscar”.</div></td></tr>
       </tbody>
     </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Ajustar saldo de um produto</h2>
+    <span class="hint">O único lugar desta tela que grava no banco.</span>
+  </div>
+  <div class="card-body">
+    <div class="toolbar" style="padding:0">
+      <input type="text" id="ajusteCodigo" placeholder="Código do produto: 5197 ou 005197" style="flex:1" />
+      <button type="button" id="btnAjusteVer">Ver saldo</button>
+    </div>
+    <div id="ajusteProduto" style="margin:0.8rem 0 0"></div>
+    <p class="muted" style="margin:0.8rem 0 0">
+      Grava <span class="chip">QTD</span>, que é o saldo real.
+      <span class="chip">QTD_SALDO</span> e <span class="chip">QTD_DISPONIVEL</span> são calculados
+      pelo banco e se ajustam sozinhos. O valor <b>substitui</b> o saldo atual, não soma.
+      Saldo negativo é recusado, e o UPDATE só é confirmado se afetar 1 linha.
+    </p>
+  </div>
+  <div class="card-foot">
+    <label class="muted" for="ajusteValor">Novo saldo</label>
+    <input type="number" id="ajusteValor" step="0.0001" min="0" placeholder="50" style="width:8rem" />
+    <span class="spacer"></span>
+    <button type="button" class="danger" id="btnAjusteGravar">Gravar saldo</button>
   </div>
 </section>
 

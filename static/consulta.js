@@ -128,5 +128,82 @@
   });
   $("btnExportarSql").addEventListener("click", () => tabSql.exportar());
 
+  // ---------- ajuste de saldo de um produto ----------
+  // Único ponto desta tela que grava. O backend confere o código, recusa
+  // negativo e só confirma o UPDATE se afetar 1 linha.
+  let produtoAjuste = null;
+
+  function renderAjuste(p, destaque) {
+    produtoAjuste = p;
+    const alvo = $("ajusteProduto");
+    if (!p) {
+      alvo.innerHTML = '<span class="muted">Digite o código e clique em “Ver saldo”.</span>';
+      return;
+    }
+    const cor = destaque ? "ok" : "info";
+    alvo.innerHTML =
+      `<div class="banner ${cor}"><div>` +
+      `<b>${esc(p.codigo)} — ${esc(p.descricao)}</b>` +
+      `<span>QTD ${esc(p.qtd || "0")} · QTD_SALDO ${esc(p.qtd_saldo || "0")} · ` +
+      `QTD_DISPONIVEL ${esc(p.qtd_disponivel || "0")}</span>` +
+      `</div></div>`;
+  }
+
+  async function verSaldo() {
+    const codigo = $("ajusteCodigo").value.trim();
+    if (!codigo) {
+      setStatus("Informe o código do produto.", "err");
+      return;
+    }
+    $("btnAjusteVer").disabled = true;
+    setStatus(`Lendo o saldo de ${codigo}…`, "busy");
+    try {
+      const r = await api("/api/saldo/produto", { json: { codigo } });
+      renderAjuste(r.produto, false);
+      setStatus(`${r.produto.codigo}: QTD ${r.produto.qtd || "0"}.`, "ok");
+    } catch (e) {
+      renderAjuste(null);
+      setStatus(e.message, "err");
+    } finally {
+      $("btnAjusteVer").disabled = false;
+    }
+  }
+
+  async function gravarAjuste() {
+    const codigo = $("ajusteCodigo").value.trim();
+    const valor = $("ajusteValor").value.trim();
+    if (!codigo || valor === "") {
+      setStatus("Informe o código e o novo saldo.", "err");
+      return;
+    }
+    const atual =
+      produtoAjuste && produtoAjuste.codigo.replace(/^0+/, "") === codigo.replace(/^0+/, "")
+        ? `\n\nProduto: ${produtoAjuste.descricao}\nSaldo de agora: ${produtoAjuste.qtd || "0"}`
+        : "\n\n⚠ Você ainda não viu o saldo deste código.";
+    if (!confirm(`Gravar QTD = ${valor} no produto ${codigo}?${atual}\n\nO valor substitui o saldo atual, não soma.`))
+      return;
+
+    $("btnAjusteGravar").disabled = true;
+    setStatus(`Gravando saldo de ${codigo}…`, "busy");
+    try {
+      const r = await api("/api/saldo/ajustar", { json: { codigo, valor } });
+      renderAjuste(r.depois, true);
+      $("ajusteCodigo").value = r.depois.codigo;
+      setStatus(r.situacao, "ok");
+    } catch (e) {
+      setStatus(e.message, "err");
+    } finally {
+      $("btnAjusteGravar").disabled = false;
+    }
+  }
+
+  $("btnAjusteVer").addEventListener("click", verSaldo);
+  $("ajusteCodigo").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") verSaldo();
+  });
+  $("ajusteCodigo").addEventListener("input", () => renderAjuste(null));
+  $("btnAjusteGravar").addEventListener("click", gravarAjuste);
+  renderAjuste(null);
+
   buscar();
 })();

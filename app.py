@@ -5,6 +5,8 @@ import threading
 from flask import Flask, jsonify, render_template, request
 
 import progresso
+from ajuste_saldo import ajustar as ajustar_saldo
+from ajuste_saldo import consultar as consultar_saldo
 from backup_service import fazer_backup, listar_backups
 from consulta import buscar_estoque, executar_select
 from conexao_store import carregar as carregar_conexao
@@ -171,6 +173,26 @@ def api_consulta_sql():
     payload = request.get_json(force=True) or {}
     try:
         return jsonify(executar_select(payload.get("sql", ""), payload.get("limite")))
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 400
+
+
+@app.post("/api/saldo/produto")
+def api_saldo_produto():
+    """Só leitura: saldo atual de um produto, para a tela conferir antes."""
+    payload = request.get_json(force=True, silent=True) or {}
+    try:
+        return jsonify(consultar_saldo(payload.get("codigo", "")))
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 400
+
+
+@app.post("/api/saldo/ajustar")
+def api_saldo_ajustar():
+    """Grava QTD de UM produto. COMMIT só se afetar 1 linha."""
+    payload = request.get_json(force=True, silent=True) or {}
+    try:
+        return jsonify(ajustar_saldo(payload.get("codigo", ""), payload.get("valor")))
     except Exception as e:
         return jsonify({"ok": False, "erro": str(e) or type(e).__name__}), 400
 
