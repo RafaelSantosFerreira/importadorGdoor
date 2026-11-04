@@ -257,7 +257,7 @@
   });
 
   const painelSaldo = criarPainelDiferenca({
-    aba: "sal", campo: "QTD_SALDO", rotulo: "saldo", rotuloGravar: "Gravar saldo",
+    aba: "sal", campo: "QTD", rotulo: "saldo", rotuloGravar: "Gravar saldo",
     motivoCurto: "saldo negativo", arquivo: "diferencas_saldo",
     tabela: "tabelaSal", busca: "buscaSal", info: "infoSal", toolbar: "toolbarSal",
     badge: "salBadge", banner: "bannerSal", exportar: "btnExportarSal",
@@ -583,7 +583,7 @@
     .then((m) => {
       const col = (m.mapeamento || {}).PRECO_VENDA;
       if (col) $("colPrecoDif").textContent = col;
-      const colQtd = (m.mapeamento || {}).QTD_SALDO;
+      const colQtd = (m.mapeamento || {}).QTD;
       if (colQtd) $("colSaldo").textContent = colQtd;
     })
     .catch(() => {});

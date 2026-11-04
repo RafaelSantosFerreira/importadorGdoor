@@ -196,7 +196,7 @@ def api_validacao_barras_definir():
 
 @app.post("/api/saldo/diferencas")
 def api_saldo_diferencas():
-    """Só leitura: lista QTD_SALDO <> qtd_atual casando por id_identificador."""
+    """Só leitura: lista QTD <> qtd_atual casando por id_identificador."""
 
     def worker():
         try:
