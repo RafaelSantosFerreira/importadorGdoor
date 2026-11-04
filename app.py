@@ -5,6 +5,7 @@ import threading
 from flask import Flask, jsonify, render_template, request
 
 import progresso
+from backup_service import fazer_backup, listar_backups
 from consulta import buscar_estoque, executar_select
 from conexao_store import carregar as carregar_conexao
 from conexao_store import salvar as salvar_conexao
@@ -13,6 +14,8 @@ from db import listar_campos_estoque, listar_valores_distintos, testar_conexao
 from diferenca_preco import aplicar_diferencas_preco, buscar_diferencas_preco
 from diferenca_saldo import aplicar_diferencas_saldo, buscar_diferencas_saldo
 from faltantes import buscar_faltantes
+from inserir_por_ncm import aplicar as aplicar_inserir_ncm
+from inserir_por_ncm import previa as previa_inserir_ncm
 from validacao_barras import definir as definir_validacao
 from validacao_barras import status as status_validacao
 from mapeamento_store import aplicar_sugestao, carregar as carregar_mapeamento
@@ -239,6 +242,71 @@ def api_faltantes():
     if not ok:
         return jsonify({"ok": False, "erro": msg}), 409
     return jsonify({"ok": True, "started": True})
+
+
+@app.get("/api/backup")
+def api_backup_listar():
+    return jsonify({"ok": True, "backups": listar_backups()})
+
+
+@app.post("/api/backup")
+def api_backup():
+    """Gera um .fbk do banco configurado, com o servidor ligado."""
+
+    def worker():
+        try:
+            progresso.finish(fazer_backup())
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    ok, msg = _iniciar_job("backup", "Gerando backup do banco…", worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True})
+
+
+def _escolhas(payload: dict) -> dict[str, str]:
+    """{codigo_csv: codigo_modelo} escolhidos na tela para itens sem modelo."""
+    bruto = payload.get("escolhas") or {}
+    if not isinstance(bruto, dict):
+        return {}
+    return {str(k).strip(): str(v).strip() for k, v in bruto.items() if str(v or "").strip()}
+
+
+@app.post("/api/faltantes/ncm/previa")
+def api_faltantes_ncm_previa():
+    """Só leitura: faltantes do CSV e o produto modelo (mesmo NCM) de cada um."""
+    escolhas = _escolhas(request.get_json(force=True, silent=True) or {})
+
+    def worker():
+        try:
+            progresso.finish(previa_inserir_ncm(escolhas))
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    ok, msg = _iniciar_job("ncm_previa", "Procurando modelos por NCM…", worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True})
+
+
+@app.post("/api/faltantes/ncm/aplicar")
+def api_faltantes_ncm_aplicar():
+    payload = request.get_json(force=True, silent=True) or {}
+    dry_run = bool(payload.get("dry_run", True))
+    escolhas = _escolhas(payload)
+
+    def worker():
+        try:
+            progresso.finish(aplicar_inserir_ncm(dry_run=dry_run, escolhas=escolhas))
+        except Exception as e:
+            progresso.finish(erro=str(e) or type(e).__name__)
+
+    titulo = "Simulando inserção dos faltantes…" if dry_run else "Inserindo faltantes…"
+    ok, msg = _iniciar_job("ncm_aplicar", titulo, worker)
+    if not ok:
+        return jsonify({"ok": False, "erro": msg}), 409
+    return jsonify({"ok": True, "started": True, "dry_run": dry_run})
 
 
 @app.post("/api/preco/diferencas")

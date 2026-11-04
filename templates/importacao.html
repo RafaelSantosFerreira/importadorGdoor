@@ -3,9 +3,26 @@
 {% block heading %}Importação{% endblock %}
 {% block subtitle %}Compare o CSV com a tabela ESTOQUE e aplique preço e saldo.{% endblock %}
 {% block status %}
-  <div id="status" class="status-bar" role="status" aria-live="polite">Busque as diferenças e simule antes de gravar.</div>
+  <div id="status" class="status-bar" role="status" aria-live="polite">Busque as diferenças antes de gravar.</div>
 {% endblock %}
 {% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Backup do banco</h2>
+    <span class="hint">Faça antes de gravar. Roda com o banco em uso.</span>
+  </div>
+  <div class="card-body">
+    <p class="muted" style="margin:0 0 0.5rem">
+      Gera um <span class="chip">.fbk</span> pelo próprio Firebird (o mesmo que o <code>gbak</code>) na pasta
+      <span class="chip">backup</span> do projeto, com data e hora no nome.
+    </p>
+    <div id="listaBackups" class="muted">Carregando backups…</div>
+  </div>
+  <div class="card-foot">
+    <button type="button" class="primary" id="btnBackup">Fazer backup agora</button>
+  </div>
+</section>
+
 <section class="card">
   <div class="card-head">
     <h2>Validação de código de barras</h2>
@@ -34,7 +51,7 @@
       só onde os dois estão diferentes.
     </p>
     <p class="muted" style="margin:0">
-      <b>Buscar</b> não altera nada. <b>Simular</b> executa e desfaz. Preço <code>0</code> no CSV contra
+      <b>Buscar</b> não altera nada. Preço <code>0</code> no CSV contra
       preço maior que zero no banco aparece marcado na lista, mas nunca é gravado.
       Códigos que não existem no banco são só listados.
     </p>
@@ -42,7 +59,6 @@
   <div class="card-foot">
     <button type="button" id="btnDifBuscar">Buscar diferenças</button>
     <span class="spacer"></span>
-    <button type="button" id="btnDifSimular">Simular</button>
     <button type="button" class="danger" id="btnDifAplicar">Gravar preços</button>
   </div>
 </section>
@@ -59,14 +75,13 @@
       só onde os dois estão diferentes.
     </p>
     <p class="muted" style="margin:0">
-      <b>Buscar</b> não altera nada. <b>Simular</b> executa e desfaz. Quantidade negativa no CSV
+      <b>Buscar</b> não altera nada. Quantidade negativa no CSV
       aparece marcada na lista, mas nunca é gravada.
     </p>
   </div>
   <div class="card-foot">
     <button type="button" id="btnSalBuscar">Buscar diferenças</button>
     <span class="spacer"></span>
-    <button type="button" id="btnSalSimular">Simular</button>
     <button type="button" class="danger" id="btnSalAplicar">Gravar saldo</button>
   </div>
 </section>
@@ -83,12 +98,38 @@
       (<span class="chip">cast as int</span> nos dois lados).
     </p>
     <p class="muted" style="margin:0">
-      Lista todos os faltantes, com a linha do arquivo. Para cadastrar, use
-      <b>Inserir produtos novos</b> na importação completa.
+      Lista todos os faltantes, com a linha do arquivo. Para cadastrar, use o card abaixo.
     </p>
   </div>
   <div class="card-foot">
     <button type="button" id="btnFaltantes">Buscar faltantes</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Inserir faltantes copiando produto do mesmo NCM</h2>
+    <span class="hint">INSERT … SELECT a partir de um produto modelo.</span>
+  </div>
+  <div class="card-body">
+    <p style="margin:0 0 0.5rem">
+      Para cada código do CSV que não existe no banco, copia o produto ativo de
+      <b>maior CODIGO</b> com o mesmo <span class="chip">COD_NCM</span>, trocando
+      <span class="chip">CODIGO</span>, <span class="chip">DESCRICAO</span>,
+      <span class="chip">BARRAS</span>, <span class="chip">PRECO_VENDA</span> e o saldo
+      (<span class="chip">QTD</span>; o <span class="chip">QTD_SALDO</span> é calculado pelo banco) pelos valores do CSV.
+      <span class="chip">DATA_CADASTRO</span> vira a data de hoje.
+    </p>
+    <p class="muted" style="margin:0">
+      <b>Prévia</b> não altera nada. Sem produto com o mesmo NCM, o item fica de fora e aparece no log;
+      digite na coluna <b>Modelo</b> o código de um produto para copiar e rode a prévia de novo.
+      Qualquer erro: nada é gravado.
+    </p>
+  </div>
+  <div class="card-foot">
+    <button type="button" id="btnNcmPrevia">Prévia</button>
+    <span class="spacer"></span>
+    <button type="button" class="danger" id="btnNcmAplicar">Inserir produtos</button>
   </div>
 </section>
 
@@ -110,6 +151,7 @@
     <button type="button" role="tab" id="tabDif" aria-selected="true" aria-controls="painelDif">Diferenças de preço <span class="count" id="difBadge" hidden></span></button>
     <button type="button" role="tab" id="tabSal" aria-selected="false" aria-controls="painelSal">Diferenças de saldo <span class="count" id="salBadge" hidden></span></button>
     <button type="button" role="tab" id="tabFalta" aria-selected="false" aria-controls="painelFalta">Faltando no banco <span class="count" id="faltaBadge" hidden></span></button>
+    <button type="button" role="tab" id="tabNcm" aria-selected="false" aria-controls="painelNcm">Inserir por NCM <span class="count" id="ncmBadge" hidden></span></button>
   </div>
 
   <div id="painelDif" role="tabpanel" aria-labelledby="tabDif">
@@ -208,6 +250,43 @@
         </thead>
         <tbody>
           <tr><td colspan="7"><div class="empty"><b>Nenhuma busca ainda</b>Clique em “Buscar faltantes”.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="painelNcm" role="tabpanel" aria-labelledby="tabNcm" hidden>
+    <div id="bannerNcm"></div>
+    <div class="card-body tiles">
+      <div class="tile"><span>Linhas no CSV</span><strong id="nTotal">—</strong></div>
+      <div class="tile warn"><span>Faltando no banco</span><strong id="nFalta">—</strong></div>
+      <div class="tile ok"><span>Com modelo</span><strong id="nCom">—</strong></div>
+      <div class="tile danger"><span>Sem modelo</span><strong id="nSem">—</strong></div>
+      <div class="tile info"><span>Inseridos</span><strong id="nIns">—</strong></div>
+    </div>
+    <div class="toolbar" id="toolbarNcm" hidden>
+      <input type="search" id="buscaNcm" placeholder="Buscar código, descrição ou NCM…" />
+      <label class="muted"><input type="checkbox" id="soSemModelo" /> só sem modelo</label>
+      <span class="muted" id="infoNcm"></span>
+      <span class="spacer"></span>
+      <button type="button" class="small" id="btnExportarNcm">Baixar log CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="tabelaNcm">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descrição (CSV)</th>
+            <th>NCM</th>
+            <th>Cód. barras</th>
+            <th class="num">Preço venda</th>
+            <th class="num">Saldo</th>
+            <th>Modelo</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="8"><div class="empty"><b>Nenhuma prévia ainda</b>Clique em “Prévia” no card de inserção por NCM.</div></td></tr>
         </tbody>
       </table>
     </div>
